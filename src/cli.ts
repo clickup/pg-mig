@@ -21,14 +21,8 @@ import { makeMigration } from "./utils/makeMigration";
 // yarn db:migrate --make=space_members_add_email@sh0000
 // yarn db:migrate --undo 20191107201239.space_members.sh0000
 // yarn db:migrate --undo 20191107201238.space_users_remove.sh
-main()
-  .then((success) => process.exit(success ? 0 : 1))
-  .catch((e) => {
-    printError(e);
-    process.exit(1);
-  });
 
-async function main() {
+export async function main() {
   const args = new Args(
     process.argv,
     ["hosts", "user", "pass", "db", "dir", "parallelism", "undo", "make"],
@@ -166,4 +160,13 @@ async function main() {
   }
 
   return success;
+}
+
+if (require.main === module) {
+  main()
+    .then((success) => process.exit(success ? 0 : 1))
+    .catch((e) => {
+      printError(e);
+      process.exit(1);
+    });
 }
