@@ -25,7 +25,9 @@ import { makeMigration } from "./utils/makeMigration";
 export async function main() {
   const args = new Args(
     process.argv,
-    ["hosts", "user", "pass", "db", "dir", "parallelism", "undo", "make"],
+    // Notice that we use --migdir and not --dir, because @mapbox/node-pre-gyp
+    // used by bcrypt conflicts with --dir option.
+    ["hosts", "user", "pass", "db", "migdir", "parallelism", "undo", "make"],
     ["dry", "ci", "list"]
   );
   const hosts = args
@@ -38,13 +40,13 @@ export async function main() {
   const dry = args.flag("dry");
   const list = args.flag("list");
   const make = args.get("make", "");
-  const dir = args.get("dir");
+  const migDir = args.get("migdir");
   const parallelism = parseInt(args.get("parallelism", "0")) || 10;
 
   const hostDests = hosts.map(
     (host) => new Dest(host, user, pass, db, "public")
   );
-  const registry = new Registry(dir);
+  const registry = new Registry(migDir);
 
   if (make) {
     // example: create_table_x@sh
@@ -73,7 +75,11 @@ export async function main() {
     }
 
     printText("\nMaking migration files...");
-    const createdFiles = await makeMigration(dir, migrationName, schemaPrefix);
+    const createdFiles = await makeMigration(
+      migDir,
+      migrationName,
+      schemaPrefix
+    );
     for (const file of createdFiles) {
       printText(file);
     }
