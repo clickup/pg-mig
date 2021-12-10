@@ -14,7 +14,7 @@ export class Psql {
   private _code: number | undefined = undefined;
   private _stdout: string = "";
   private _stderr: string = "";
-  private _out: string = "";
+  private _out: string = ""; // a mix of stdin and stdout
   private _cmdline: string;
 
   constructor(
@@ -73,23 +73,36 @@ export class Psql {
           PATH: process.env.PATH,
         },
       });
+
+      let clearSetInResponse = false;
       if (this.stdin) {
+        proc.stdin.write("SET statement_timeout TO 0;\n");
+        clearSetInResponse = true;
         proc.stdin.write(this.stdin);
         proc.stdin.end();
       }
 
       proc.stdout.on("data", (data) => {
-        const str = data.toString();
+        let str = data.toString();
+        if (clearSetInResponse) {
+          str = str.replace(/^SET\r?\n/s, "");
+          clearSetInResponse = false;
+        }
+
         this._stdout += str;
         this._out += str;
-        onOut(this);
+        if (this._stdout !== "") {
+          onOut(this);
+        }
       });
+
       proc.stderr.on("data", (data) => {
         const str = data.toString();
         this._stderr += str;
         this._out += str;
         onOut(this);
       });
+
       proc.on("close", (code) => {
         this._code = code;
         resolve(this);
