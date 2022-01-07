@@ -42,7 +42,7 @@ export function renderGrid(grid: Grid) {
         colors.red("#"),
         colors.red(dest.toString() + " <- " + migration.version),
       ]);
-      errorRows.push(["", ("" + error).trimRight()]);
+      errorRows.push(["", ("" + error).trimEnd()]);
       errorRows.push(["", ""]);
     }
   }
@@ -87,7 +87,7 @@ export function renderGrid(grid: Grid) {
         "\n" +
         table1.toString() +
         "\n"
-      : "") + (errorRows.length > 0 ? table2.toString().trimRight() + "\n" : "")
+      : "") + (errorRows.length > 0 ? table2.toString().trimEnd() + "\n" : "")
   );
 }
 

@@ -199,8 +199,8 @@ class Worker {
           this._curLine = proc.lastOutLine;
         }
       );
-      if (res.code !== 0) {
-        throw res.out.trimRight();
+      if (res.code) {
+        throw res.out.trimEnd();
       }
 
       if (migration.file.delay > 0) {

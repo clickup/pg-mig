@@ -11,7 +11,7 @@ import { Dest } from "./Dest";
  */
 export class Psql {
   private _args: string[];
-  private _code: number | undefined = undefined;
+  private _code: number | null = null;
   private _stdout: string = "";
   private _stderr: string = "";
   private _out: string = ""; // a mix of stdin and stdout
@@ -56,7 +56,7 @@ export class Psql {
       pos = this._out.lastIndexOf("\n", end - 1);
     }
 
-    const line = this._out.substring(pos + 1, end).trimRight();
+    const line = this._out.substring(pos + 1, end).trimEnd();
     return line;
   }
 

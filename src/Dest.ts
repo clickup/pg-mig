@@ -116,12 +116,12 @@ export class Dest {
     const SEP = "\x01";
     const psql = new Psql(this, ".", ["-At", "-F", SEP], sql);
     const { code, stdout, out } = await psql.run();
-    if (code !== 0) {
+    if (code) {
       throw "psql failed (" + this.toString() + ")\n" + out;
     }
 
     return stdout
-      .trimRight()
+      .trimEnd()
       .split("\n")
       .filter((row) => row.length > 0)
       .map((row) => row.split(SEP));
