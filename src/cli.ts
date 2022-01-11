@@ -27,12 +27,23 @@ export async function main() {
     process.argv,
     // Notice that we use --migdir and not --dir, because @mapbox/node-pre-gyp
     // used by bcrypt conflicts with --dir option.
-    ["hosts", "user", "pass", "db", "migdir", "parallelism", "undo", "make"],
+    [
+      "hosts",
+      "port",
+      "user",
+      "pass",
+      "db",
+      "migdir",
+      "parallelism",
+      "undo",
+      "make",
+    ],
     ["dry", "ci", "list"]
   );
   const hosts = args
     .get("hosts", process.env.PGHOST || "localhost")
     .split(/[\s,;]+/);
+  const port = parseInt(args.get("port", process.env.PGPORT || "6543"));
   const user = args.get("user", process.env.PGUSER || "");
   const pass = args.get("pass", process.env.PGPASSWORD || "");
   const db = args.get("db", process.env.PGDATABASE);
@@ -44,7 +55,7 @@ export async function main() {
   const parallelism = parseInt(args.get("parallelism", "0")) || 10;
 
   const hostDests = hosts.map(
-    (host) => new Dest(host, user, pass, db, "public")
+    (host) => new Dest(host, port, user, pass, db, "public")
   );
   const registry = new Registry(migDir);
 

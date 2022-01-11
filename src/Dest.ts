@@ -10,6 +10,7 @@ const FUNC_NAME = "mig_versions_const";
 export class Dest {
   constructor(
     public readonly host: string,
+    public readonly port: number,
     public readonly user: string,
     public readonly pass: string,
     public readonly db: string,
@@ -20,7 +21,14 @@ export class Dest {
    * Returns a Dest switched to a different schema.
    */
   createSchemaDest(schema: string) {
-    return new Dest(this.host, this.user, this.pass, this.db, schema);
+    return new Dest(
+      this.host,
+      this.port,
+      this.user,
+      this.pass,
+      this.db,
+      schema
+    );
   }
 
   /**

@@ -67,6 +67,7 @@ export class Psql {
         env: {
           ...process.env,
           PGHOST: this.dest.host,
+          PGPORT: this.dest.port.toString(),
           PGUSER: this.dest.user,
           PGPASSWORD: this.dest.pass,
           PGDATABASE: this.dest.db,
