@@ -43,7 +43,7 @@ export async function main() {
   const hosts = args
     .get("hosts", process.env.PGHOST || "localhost")
     .split(/[\s,;]+/);
-  const port = parseInt(args.get("port", process.env.PGPORT || "6543"));
+  const port = parseInt(args.get("port", process.env.PGPORT || "5432"));
   const user = args.get("user", process.env.PGUSER || "");
   const pass = args.get("pass", process.env.PGPASSWORD || "");
   const db = args.get("db", process.env.PGDATABASE);
