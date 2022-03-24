@@ -60,8 +60,9 @@ export class Dest {
         `SET search_path TO ${this.schema};\n` +
         `\\i ${basename(file)}\n` +
         (newVersions
-          ? `CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_NAME}() RETURNS text LANGUAGE sql AS $$` +
-            `SELECT ${this.escape(JSON.stringify(newVersions))}; $$;\n`
+          ? `CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_NAME}() RETURNS text ` +
+            `LANGUAGE sql SET search_path FROM CURRENT AS ` +
+            `$$ SELECT ${this.escape(JSON.stringify(newVersions))}; $$;\n`
           : "") +
         `COMMIT;\n`
     );
