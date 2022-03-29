@@ -104,12 +104,11 @@ export class Registry {
   getVersions() {
     return [...this.versions];
   }
-
   groupBySchema(schemas: string[]): ReadonlyMap<string, Entry[]> {
     const entriesBySchema = new Map<string, Entry[]>();
     for (const schema of schemas) {
       for (const [schemaPrefix, list] of this.entriesByPrefix.entries()) {
-        if (!schema.startsWith(schemaPrefix)) {
+        if (!schemaNameMatchesPrefix(schema, schemaPrefix)) {
           continue;
         }
 
@@ -149,6 +148,13 @@ export class Registry {
     const matches = name.match(/^\d+\.[^.]+\.[^.]+/);
     return matches ? matches[0] : name;
   }
+}
+
+function schemaNameMatchesPrefix(schema: string, prefix: string) {
+  return (
+    schema.startsWith(prefix) &&
+    schema.substring(prefix.length).match(/^(\d|$)/s)
+  );
 }
 
 function buildFile(fileName: string): File {
