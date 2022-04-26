@@ -21,7 +21,7 @@ export class Psql {
     private dest: Dest,
     private cwd: string,
     args: string[],
-    private stdin?: string
+    private stdin: string
   ) {
     this._args = ["-X", ...args];
     this._cmdline = "psql " + quote(this._args);
@@ -77,7 +77,6 @@ export class Psql {
 
       let clearSetInResponse = false;
       if (this.stdin) {
-        proc.stdin.write("SET statement_timeout TO 0;\n");
         clearSetInResponse = true;
         proc.stdin.write(this.stdin);
         proc.stdin.end();

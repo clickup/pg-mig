@@ -51,20 +51,45 @@ export class Dest {
       this,
       dirname(file),
       [],
-      // For some reason, -c... -f... -c... is not transactional, even with -1 flag;
-      // e.g. with -f... -c... when we press Ctrl+C, sometimes FUNC_NAME is not
-      // created, although -f... file was committed. So we just manually wrap everything
-      // with a transaction manually (not with -1).
-      `BEGIN;\n` +
-        `\\set ON_ERROR_STOP on\n` +
-        `SET search_path TO ${this.schema};\n` +
-        `\\i ${basename(file)}\n` +
-        (newVersions
+      [
+        `\\set ON_ERROR_STOP on`,
+        // For some reason, -c... -f... -c... is not transactional, even with -1
+        // flag; e.g. with -f... -c... when we press Ctrl+C, sometimes FUNC_NAME
+        // is not created, although -f... file was committed. So we just
+        // manually wrap everything with a transaction manually (not with -1).
+        "BEGIN;",
+        // We can't use SET LOCAL here, because migration files may contain
+        // their own COMMIT statements (e.g. to create indexes concurrently),
+        // and we want to remain the search_path set. Mid-COMMITs are not
+        // compatible with PgBouncer in transaction pooling mode though.
+        `SET search_path TO ${this.schema};`,
+        "SET statement_timeout TO 0;",
+        // Run the actual migration file.
+        `\\i ${basename(file)}`,
+        ";",
+        // Update schema version in the same transaction.
+        newVersions
           ? `CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_NAME}() RETURNS text ` +
             `LANGUAGE sql SET search_path FROM CURRENT AS ` +
-            `$$ SELECT ${this.escape(JSON.stringify(newVersions))}; $$;\n`
-          : "") +
-        `COMMIT;\n`
+            `$$ SELECT ${this.escape(JSON.stringify(newVersions))}; $$;`
+          : "",
+        // In case PgBouncer in transaction pooling mode is used, we must
+        // discard the effect of the migration for the connection. We can't use
+        // DISCARD ALL since it can't be run inside a transaction (for some
+        // unknown reason), so we manually run the queries DISCARD ALL would run
+        // (see https://www.postgresql.org/docs/14/sql-discard.html).
+        "CLOSE ALL;",
+        "SET SESSION AUTHORIZATION DEFAULT;",
+        "RESET ALL;",
+        "DEALLOCATE ALL;",
+        "UNLISTEN *;",
+        "SELECT pg_advisory_unlock_all();",
+        "DISCARD PLANS;",
+        "DISCARD TEMP;",
+        "DISCARD SEQUENCES;",
+        // Commit both the migration and the version.
+        "COMMIT;",
+      ].join("\n")
     );
     return psql.run(onOut);
   }

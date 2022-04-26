@@ -1,7 +1,7 @@
 {
   "name": "pg-mig",
   "description": "Postgres database migration tool with multi-schema (sharding) support",
-  "version": "2.10.63",
+  "version": "2.10.156",
   "license": "UNLICENSED",
   "private": true,
   "main": "dist/cli.js",
