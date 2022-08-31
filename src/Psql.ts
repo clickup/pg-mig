@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { quote } from "shell-quote";
-import { Dest } from "./Dest";
+import type { Dest } from "./Dest";
 
 /**
  * A wrapper for running psql.

@@ -1,9 +1,9 @@
 import colors from "colors";
 import sortBy from "lodash/sortBy";
-import { Dest } from "./Dest";
-import { Grid } from "./Grid";
-import { Chain } from "./Patch";
-import { Registry } from "./Registry";
+import type { Dest } from "./Dest";
+import type { Grid } from "./Grid";
+import type { Chain } from "./Patch";
+import type { Registry } from "./Registry";
 import { collapse } from "./utils/collapse";
 import { DefaultMap } from "./utils/DefaultMap";
 

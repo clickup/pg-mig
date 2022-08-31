@@ -4,7 +4,8 @@ import throttle from "lodash/throttle";
 import logUpdate from "log-update";
 import { Dest } from "./Dest";
 import { Grid } from "./Grid";
-import { Chain, Patch } from "./Patch";
+import type { Chain } from "./Patch";
+import { Patch } from "./Patch";
 import { Registry } from "./Registry";
 import {
   printError,

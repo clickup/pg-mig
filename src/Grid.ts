@@ -1,8 +1,8 @@
 import { Semaphore } from "await-semaphore";
 import groupBy from "lodash/groupBy";
 import sum from "lodash/sum";
-import { Dest } from "./Dest";
-import { Chain, Migration } from "./Patch";
+import type { Dest } from "./Dest";
+import type { Chain, Migration } from "./Patch";
 
 /**
  * A fixed set of Workers running the migration chains.

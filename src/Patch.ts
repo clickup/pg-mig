@@ -1,7 +1,7 @@
 import flatten from "lodash/flatten";
 import sortBy from "lodash/sortBy";
-import { Dest } from "./Dest";
-import { Entry, File, Registry } from "./Registry";
+import type { Dest } from "./Dest";
+import type { Entry, File, Registry } from "./Registry";
 
 interface Mode {
   undo: string | undefined;
