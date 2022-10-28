@@ -41,28 +41,56 @@ export async function main() {
     ],
     ["dry", "ci", "list"]
   );
-  const hosts = args
-    .get("hosts", process.env.PGHOST || "localhost")
-    .split(/[\s,;]+/);
-  const port = parseInt(args.get("port", process.env.PGPORT || "5432"));
-  const user = args.get("user", process.env.PGUSER || "");
-  const pass = args.get("pass", process.env.PGPASSWORD || "");
-  const db = args.get("db", process.env.PGDATABASE);
-  const undo = args.get("undo", "empty");
-  const dry = args.flag("dry");
-  const list = args.flag("list");
-  const make = args.get("make", "");
-  const migDir = args.get("migdir");
-  const parallelism = parseInt(args.get("parallelism", "0")) || 10;
+  return migrate({
+    hosts: args
+      .get("hosts", process.env.PGHOST || "localhost")
+      .split(/[\s,;]+/),
+    port: parseInt(args.get("port", process.env.PGPORT || "5432")),
+    user: args.get("user", process.env.PGUSER || ""),
+    pass: args.get("pass", process.env.PGPASSWORD || ""),
+    db: args.get("db", process.env.PGDATABASE),
+    undo: args.get("undo", "empty"),
+    dry: args.flag("dry"),
+    list: args.flag("list"),
+    make: args.get("make", ""),
+    migDir: args.get("migdir"),
+    parallelism: parseInt(args.get("parallelism", "0")) || 10,
+    ci: args.flag("ci"),
+  });
+}
 
-  const hostDests = hosts.map(
-    (host) => new Dest(host, port, user, pass, db, "public")
+export async function migrate(options: {
+  hosts: string[];
+  port: number;
+  user: string;
+  pass: string;
+  db: string;
+  undo: string;
+  dry: boolean;
+  list: boolean;
+  make: string;
+  migDir: string;
+  parallelism: number;
+  ci: boolean;
+}) {
+  const hostDests = options.hosts.map(
+    (host) =>
+      new Dest(
+        host,
+        options.port,
+        options.user,
+        options.pass,
+        options.db,
+        "public"
+      )
   );
-  const registry = new Registry(migDir);
+  const registry = new Registry(options.migDir);
 
-  if (make) {
+  printText(`Running on ${options.hosts}:${options.port} ${options.db}`);
+
+  if (options.make) {
     // example: create_table_x@sh
-    const [migrationName, schemaPrefix] = make.split("@");
+    const [migrationName, schemaPrefix] = options.make.split("@");
 
     const usage = "Format: --make=migration_name@schema_prefix";
     if (!migrationName || !migrationName.match(/^[a-z0-9_]+$/)) {
@@ -88,7 +116,7 @@ export async function main() {
 
     printText("\nMaking migration files...");
     const createdFiles = await makeMigration(
-      migDir,
+      options.migDir,
       migrationName,
       schemaPrefix
     );
@@ -99,7 +127,7 @@ export async function main() {
     return true;
   }
 
-  if (list) {
+  if (options.list) {
     printText("All versions:");
 
     for (const version of sortBy(registry.getVersions())) {
@@ -109,19 +137,19 @@ export async function main() {
     return true;
   }
 
-  if (undo === "") {
+  if (options.undo === "") {
     printText(await renderLatestVersions(hostDests, registry));
     printError("Please provide a migration version to undo.");
     return false;
   }
 
   const patch = new Patch(hostDests, registry, {
-    undo: undo !== "empty" ? undo : undefined,
+    undo: options.undo !== "empty" ? options.undo : undefined,
   });
   const chains = await patch.getChains();
 
   const [summary, hasWork] = renderPatchSummary(chains);
-  if (!hasWork || dry) {
+  if (!hasWork || options.dry) {
     printText(await renderLatestVersions(hostDests, registry));
     printText(summary);
     return true;
@@ -155,17 +183,17 @@ export async function main() {
         ],
       }))
     : [];
-  const grid = new Grid(chains, parallelism, beforeChains, afterChains);
+  const grid = new Grid(chains, options.parallelism, beforeChains, afterChains);
 
   const success = await grid.run(
     throttle(() => {
       const lines = renderGrid(grid).split("\n");
-      if (!args.flag("ci")) {
+      if (!options.ci) {
         logUpdate(lines.slice(0, (process.stdout.rows || 20) - 1).join("\n"));
       }
     }, 100)
   );
-  if (!args.flag("ci")) {
+  if (!options.ci) {
     logUpdate.clear();
   }
 
