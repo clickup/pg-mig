@@ -154,7 +154,7 @@ class Worker {
         } catch (error) {
           this._errorMigrations.push({
             dest: chain.dest,
-            migration: migration,
+            migration,
             error,
           });
           break;
