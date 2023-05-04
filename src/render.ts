@@ -57,9 +57,9 @@ export function renderGrid(grid: Grid) {
   });
 
   const { processedMigrations, totalMigrations, elapsedSeconds } = grid;
-  const leftMigrations = totalMigrations - processedMigrations;
+  const leftMigrations = Math.max(totalMigrations - processedMigrations, 0);
   const percentDone =
-    totalMigrations > 0
+    totalMigrations > 0 && processedMigrations <= totalMigrations
       ? Math.round((processedMigrations / totalMigrations) * 100)
       : "100";
   const leftSeconds =
