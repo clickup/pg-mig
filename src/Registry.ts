@@ -7,8 +7,8 @@ import { DefaultMap } from "./utils/DefaultMap";
  * Format is: "-- $var_name=var_value" on any line of the file.
  */
 const VALID_VARS = [
-  // Introduces a delay (in ms) between each migration. Use with $parallelism_global to
-  // reduce load on the db
+  // Introduces a delay (in ms) between each migration. Use with
+  // $parallelism_global to reduce load on the db.
   "$delay",
   // Limit parallelism of this particular version across all hosts.
   "$parallelism_global",
