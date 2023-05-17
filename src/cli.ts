@@ -93,7 +93,7 @@ export async function migrate(options: {
     const [migrationName, schemaPrefix] = options.make.split("@");
 
     const usage = "Format: --make=migration_name@schema_prefix";
-    if (!migrationName || !migrationName.match(/^[a-z0-9_]+$/)) {
+    if (!migrationName?.match(/^[a-z0-9_]+$/)) {
       printError("migration_name is missing or incorrect");
       printText(usage);
       return false;
