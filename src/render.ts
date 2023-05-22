@@ -1,4 +1,4 @@
-import colors from "colors";
+import chalk from "chalk";
 import sortBy from "lodash/sortBy";
 import type { Dest } from "./Dest";
 import type { Grid } from "./Grid";
@@ -26,10 +26,10 @@ export function renderGrid(grid: Grid) {
   )) {
     if (worker.curDest) {
       activeRows.push([
-        colors.green("  " + worker.succeededMigrations),
+        chalk.green("  " + worker.succeededMigrations),
         worker.errorMigrations.length
-          ? colors.red(worker.errorMigrations.length + "")
-          : colors.gray("0"),
+          ? chalk.red(worker.errorMigrations.length + "")
+          : chalk.gray("0"),
         formatHost(worker.curDest.host),
         worker.curDest.schema,
         worker.curMigration!.version,
@@ -39,8 +39,8 @@ export function renderGrid(grid: Grid) {
 
     for (const { dest, migration, error } of worker.errorMigrations) {
       errorRows.push([
-        colors.red("#"),
-        colors.red(dest.toString() + " <- " + migration.version),
+        chalk.red("#"),
+        chalk.red(dest.toString() + " <- " + migration.version),
       ]);
       errorRows.push(["", ("" + error).trimEnd()]);
       errorRows.push(["", ""]);
@@ -108,7 +108,7 @@ export function renderPatchSummary(chains: Chain[]): [string, boolean] {
   }
 
   return [
-    colors.yellow(
+    chalk.yellow(
       "Migrations to apply:\n" +
         (rows.length ? rows : ["<no changes>"])
           .map((s) => "  * " + s)
@@ -153,11 +153,11 @@ export function printText(text: string) {
 }
 
 export function printSuccess(text: string) {
-  return printText(colors.green("" + text));
+  return printText(chalk.green("" + text));
 }
 
 export function printError(error: any) {
-  return printText(colors.red("Error: " + error));
+  return printText(chalk.red("Error: " + error));
 }
 
 function formatHost(host: string) {
