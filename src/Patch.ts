@@ -37,16 +37,15 @@ export class Patch {
   ) {}
 
   async getChains(): Promise<Chain[]> {
-    // The algorithm is not perfect: we treat schemas independently,
-    // so even if e.g. a migration for schema=public precedes a migration
-    // for some other schema=sh1234 in the repository, there is a chance
-    // that sh1234 will be processed earlier than public. It's a trade-off
-    // to not implement a much more complicated algorithm with explicit
-    // cross-schema dependencies.
+    // The algorithm is not perfect: we treat schemas independently, so even if
+    // e.g. a migration for schema=public precedes a migration for some other
+    // schema=sh1234 in the repository, there is a chance that sh1234 will be
+    // processed earlier than public. It's a trade-off to not implement a much
+    // more complicated algorithm with explicit cross-schema dependencies.
     if (this.mode.undo) {
       const undoVersion = this.registry.extractVersion(this.mode.undo);
       if (!this.registry.hasVersion(undoVersion)) {
-        throw "No such version on disk: " + undoVersion;
+        throw `No such version on disk: ${undoVersion} (in ${this.registry.dir})`;
       }
     }
 
@@ -152,7 +151,7 @@ export class Patch {
       // undo:         e
       const undoEntry = reEntries.find((entry) => entry.name === undoVersion);
       if (!undoEntry) {
-        throw "No such version on disk for this schema: " + undoVersion;
+        throw `"No such version on disk: ${undoVersion} (in ${this.registry.dir})`;
       }
 
       return {

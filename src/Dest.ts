@@ -52,7 +52,7 @@ export class Dest {
       dirname(file),
       [],
       [
-        `\\set ON_ERROR_STOP on`,
+        "\\set ON_ERROR_STOP on",
         // For some reason, -c... -f... -c... is not transactional, even with -1
         // flag; e.g. with -f... -c... when we press Ctrl+C, sometimes FUNC_NAME
         // is not created, although -f... file was committed. So we just
@@ -70,7 +70,7 @@ export class Dest {
         // Update schema version in the same transaction.
         newVersions
           ? `CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_NAME}() RETURNS text ` +
-            `LANGUAGE sql SET search_path FROM CURRENT AS ` +
+            "LANGUAGE sql SET search_path FROM CURRENT AS " +
             `$$ SELECT ${this.escape(JSON.stringify(newVersions))}; $$;`
           : "",
         // In case PgBouncer in transaction pooling mode is used, we must

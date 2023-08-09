@@ -1,23 +1,9 @@
 import { existsSync, lstatSync, readdirSync, readFileSync } from "fs";
+import { basename } from "path";
 import sortBy from "lodash/sortBy";
 import { DefaultMap } from "./utils/DefaultMap";
-
-/**
- * Migration file may have variables in it to tune behavior of the migration.
- * Format is: "-- $var_name=var_value" on any line of the file.
- */
-const VALID_VARS = [
-  // Introduces a delay (in ms) between each migration. Use with
-  // $parallelism_global to reduce load on the db.
-  "$delay",
-  // Limit parallelism of this particular version across all hosts.
-  "$parallelism_global",
-  // Limit parallelism of this particular version locally on each host.
-  "$parallelism_per_host",
-  // If set, no other migrations (including other versions) will run on any
-  // other host while this one is running.
-  "$run_alone",
-] as const;
+import { extractVars } from "./utils/extractVars";
+import { validateCreateIndexConcurrently } from "./utils/validateCreateIndexConcurrently";
 
 /**
  * One migration file (either *.up.* or *.dn.*).
@@ -50,7 +36,7 @@ export class Registry {
   public readonly beforeFile: File | null = null;
   public readonly afterFile: File | null = null;
 
-  constructor(dir: string) {
+  constructor(public readonly dir: string) {
     const files = readdirSync(dir)
       .sort()
       .filter((file) => lstatSync(dir + "/" + file).isFile());
@@ -101,9 +87,6 @@ export class Registry {
     return Array.from(this.entriesByPrefix.keys());
   }
 
-  getVersions() {
-    return [...this.versions];
-  }
   groupBySchema(schemas: string[]): ReadonlyMap<string, Entry[]> {
     const entriesBySchema = new Map<string, Entry[]>();
     for (const schema of schemas) {
@@ -140,6 +123,10 @@ export class Registry {
     return entriesBySchema;
   }
 
+  getVersions() {
+    return [...this.versions];
+  }
+
   hasVersion(version: string) {
     return this.versions.has(version);
   }
@@ -158,38 +145,30 @@ function schemaNameMatchesPrefix(schema: string, prefix: string) {
 }
 
 function buildFile(fileName: string): File {
-  const vars = extractVars(fileName);
-  return {
+  if (!existsSync(fileName)) {
+    throw `Migration file doesn't exist: ${fileName}`;
+  }
+
+  const content = readFileSync(fileName).toString();
+  const vars = extractVars(fileName, content);
+
+  const file = {
     fileName,
     parallelismGlobal: vars.$parallelism_global || Number.POSITIVE_INFINITY,
     parallelismPerHost: vars.$parallelism_per_host || Number.POSITIVE_INFINITY,
     delay: vars.$delay || 0,
     runAlone: !!vars.$run_alone,
   };
-}
 
-function extractVars(fileName: string): {
-  [k in typeof VALID_VARS[number]]?: number;
-} {
-  if (!existsSync(fileName)) {
-    throw "Migration file doesn't exist: " + fileName;
+  const errors: string[] = [];
+  errors.push(...validateCreateIndexConcurrently(content, vars));
+
+  if (errors.length > 0) {
+    throw (
+      `File ${basename(fileName)} must satisfy the following:\n` +
+      errors.map((e) => `  - ${e}`).join("\n")
+    );
   }
 
-  const content = readFileSync(fileName).toString();
-
-  const pairs: Array<[string, string]> = [];
-  const regexIterator = /^--\s*(\$\w+)\s*=([^\r\n]+)[\r\n]*/my;
-  while (regexIterator.exec(content)) {
-    pairs.push([RegExp.$1, RegExp.$2]);
-  }
-
-  return Object.fromEntries(
-    pairs.map(([k, v]) => {
-      if (!VALID_VARS.includes(k as typeof VALID_VARS[number])) {
-        throw "Unknown variable " + k + " in " + fileName;
-      }
-
-      return [k, parseInt(v.trim())];
-    })
-  );
+  return file;
 }
