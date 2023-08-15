@@ -151,7 +151,7 @@ export class Patch {
       // undo:         e
       const undoEntry = reEntries.find((entry) => entry.name === undoVersion);
       if (!undoEntry) {
-        throw `"No such version on disk: ${undoVersion} (in ${this.registry.dir})`;
+        throw `No such version on disk: ${undoVersion} (in ${this.registry.dir})`;
       }
 
       return {
