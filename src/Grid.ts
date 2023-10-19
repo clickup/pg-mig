@@ -151,7 +151,7 @@ class Worker {
         try {
           await this.processMigration(chain.dest, migration);
           this._succeededMigrations++;
-        } catch (error) {
+        } catch (error: unknown) {
           this._errorMigrations.push({
             dest: chain.dest,
             migration,
