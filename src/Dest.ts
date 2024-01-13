@@ -14,7 +14,7 @@ export class Dest {
     public readonly user: string,
     public readonly pass: string,
     public readonly db: string,
-    public readonly schema: string
+    public readonly schema: string,
   ) {}
 
   /**
@@ -27,7 +27,7 @@ export class Dest {
       this.user,
       this.pass,
       this.db,
-      schema
+      schema,
     );
   }
 
@@ -45,7 +45,7 @@ export class Dest {
   async runFile(
     file: string,
     newVersions: string[] | null,
-    onOut: (proc: Psql) => void = () => {}
+    onOut: (proc: Psql) => void = () => {},
   ) {
     const psql = new Psql(
       this,
@@ -89,7 +89,7 @@ export class Dest {
         "DISCARD SEQUENCES;",
         // Commit both the migration and the version.
         "COMMIT;",
-      ].join("\n")
+      ].join("\n"),
     );
     return psql.run(onOut);
   }
@@ -99,7 +99,7 @@ export class Dest {
    */
   async loadSchemas() {
     return this.queryCol(
-      "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE '%\\_%'"
+      "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE '%\\_%'",
     );
   }
 
@@ -119,7 +119,7 @@ export class Dest {
       WHERE proname = ${this.escape(FUNC_NAME)} AND nspname IN(${inClause})
     `);
     const selects = schemasWithFunc.map(
-      ([schema]) => `SELECT ${this.escape(schema)}, ${schema}.${FUNC_NAME}()`
+      ([schema]) => `SELECT ${this.escape(schema)}, ${schema}.${FUNC_NAME}()`,
     );
     const rows: string[][] = [];
     for (const list of chunk(selects, 1000)) {
@@ -127,7 +127,7 @@ export class Dest {
     }
 
     const versionsBySchema = new Map(
-      schemas.map((schema) => [schema, [] as string[]])
+      schemas.map((schema) => [schema, [] as string[]]),
     );
     for (const [schema, versionsStr] of rows) {
       versionsBySchema.set(schema, JSON.parse(versionsStr));

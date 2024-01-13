@@ -5,7 +5,7 @@ import moment from "moment";
 export async function makeMigration(
   migrationDir: string,
   migrationName: string,
-  schemaPrefix: string
+  schemaPrefix: string,
 ) {
   const utcTimestamp = moment(Date.now()).utc().format("YYYYMMDDHHmmss");
 

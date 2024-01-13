@@ -39,7 +39,7 @@ export async function main() {
       "undo",
       "make",
     ],
-    ["dry", "ci", "list"]
+    ["dry", "ci", "list"],
   );
   return migrate({
     hosts: args
@@ -81,8 +81,8 @@ export async function migrate(options: {
         options.user,
         options.pass,
         options.db,
-        "public"
-      )
+        "public",
+      ),
   );
   const registry = new Registry(options.migDir);
 
@@ -107,7 +107,7 @@ export async function migrate(options: {
 
     if (!registry.prefixes.includes(schemaPrefix)) {
       printText(
-        `WARNING: schema prefix "${schemaPrefix}" wasn't found. Valid prefixes:`
+        `WARNING: schema prefix "${schemaPrefix}" wasn't found. Valid prefixes:`,
       );
       for (const prefix of registry.prefixes) {
         printText(`- ${prefix}`);
@@ -118,7 +118,7 @@ export async function migrate(options: {
     const createdFiles = await makeMigration(
       options.migDir,
       migrationName,
-      schemaPrefix
+      schemaPrefix,
     );
     for (const file of createdFiles) {
       printText(file);
@@ -191,7 +191,7 @@ export async function migrate(options: {
       if (!options.ci) {
         logUpdate(lines.slice(0, (process.stdout.rows || 20) - 1).join("\n"));
       }
-    }, 100)
+    }, 100),
   );
   if (!options.ci) {
     logUpdate.clear();

@@ -79,7 +79,7 @@ export class Registry {
     // This is needed later for duplicates removal (e.g. if some schema
     // name matches "sh0000" pattern, it shouldn't match "sh" pattern later).
     this.entriesByPrefix = new DefaultMap(
-      sortBy(Array.from(this.entriesByPrefix), ([prefix]) => -prefix.length)
+      sortBy(Array.from(this.entriesByPrefix), ([prefix]) => -prefix.length),
     );
   }
 

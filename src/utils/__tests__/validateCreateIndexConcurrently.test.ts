@@ -4,8 +4,8 @@ test("validateCreateIndexConcurrently errors", () => {
   expect(
     validateCreateIndexConcurrently(
       'CREATE INDEX CONCURRENTLY "abc" ON tbl(col);',
-      {}
-    )
+      {},
+    ),
   ).toEqual([
     '(due to having "CREATE INDEX CONCURRENTLY")',
     'start with "COMMIT;"',
@@ -24,7 +24,7 @@ test("validateCreateIndexConcurrently success", () => {
       CREATE INDEX CONCURRENTLY "abc""def" ON tbl(col);',
       BEGIN;
       CREATE TABLE some(id bigint);`,
-      { $parallelism_global: 1 }
-    )
+      { $parallelism_global: 1 },
+    ),
   ).toEqual([]);
 });

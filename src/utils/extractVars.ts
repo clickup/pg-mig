@@ -16,7 +16,7 @@ const VALID_VARS = [
 ] as const;
 
 export type Vars = {
-  [k in typeof VALID_VARS[number]]?: number;
+  [k in (typeof VALID_VARS)[number]]?: number;
 };
 
 export function extractVars(fileName: string, content: string): Vars {
@@ -28,11 +28,11 @@ export function extractVars(fileName: string, content: string): Vars {
 
   return Object.fromEntries(
     pairs.map(([k, v]) => {
-      if (!VALID_VARS.includes(k as typeof VALID_VARS[number])) {
+      if (!VALID_VARS.includes(k as (typeof VALID_VARS)[number])) {
         throw `Unknown variable ${k} in ${fileName}`;
       }
 
       return [k, parseInt(v.trim())];
-    })
+    }),
   );
 }

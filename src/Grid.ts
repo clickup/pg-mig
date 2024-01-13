@@ -16,7 +16,7 @@ export class Grid {
     private chains: Chain[],
     private workersPerHost: number,
     private beforeChains: Chain[] = [],
-    private afterChains: Chain[] = []
+    private afterChains: Chain[] = [],
   ) {}
 
   get workers(): readonly Worker[] {
@@ -61,7 +61,7 @@ export class Grid {
     }
 
     await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange))
+      this._workers.map(async (worker) => worker.run(onChange)),
     );
     if (this.numErrors) {
       return false;
@@ -82,12 +82,12 @@ export class Grid {
       }
 
       this._totalMigrations += sum(
-        chainsQueue.map((entry) => entry.migrations.length)
+        chainsQueue.map((entry) => entry.migrations.length),
       );
     }
 
     await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange))
+      this._workers.map(async (worker) => worker.run(onChange)),
     );
 
     // "After" sequence (we run it even on errors above). We don't clear
@@ -97,7 +97,7 @@ export class Grid {
     }
 
     await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange))
+      this._workers.map(async (worker) => worker.run(onChange)),
     );
     if (this.numErrors) {
       return false;
@@ -117,7 +117,7 @@ class Worker {
 
   constructor(
     private chainsQueue: Chain[],
-    private semaphores: Record<string, Semaphore>
+    private semaphores: Record<string, Semaphore>,
   ) {}
 
   get succeededMigrations(): number {
@@ -173,21 +173,21 @@ class Worker {
 
   private async processMigration(
     dest: Dest,
-    migration: Migration
+    migration: Migration,
   ): Promise<void> {
     this._curLine = "waiting to satisfy parallelism limits...";
     const releases = await Promise["all"]([
       this.acquireSemaphore(
         migration.file.runAlone ? 1 : Number.POSITIVE_INFINITY,
-        "alone"
+        "alone",
       ),
       this.acquireSemaphore(
         migration.file.parallelismGlobal,
-        migration.version
+        migration.version,
       ),
       this.acquireSemaphore(
         migration.file.parallelismPerHost,
-        dest.host + ":" + migration.version
+        dest.host + ":" + migration.version,
       ),
     ]);
     try {
@@ -197,7 +197,7 @@ class Worker {
         migration.newVersions,
         (proc) => {
           this._curLine = proc.lastOutLine;
-        }
+        },
       );
       if (res.code) {
         throw res.out.trimEnd();
@@ -205,7 +205,7 @@ class Worker {
 
       if (migration.file.delay > 0) {
         await new Promise((resolve) =>
-          setTimeout(resolve, migration.file.delay)
+          setTimeout(resolve, migration.file.delay),
         );
       }
     } finally {

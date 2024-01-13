@@ -33,7 +33,7 @@ export class Patch {
   constructor(
     private hosts: Dest[],
     private registry: Registry,
-    private mode: Mode
+    private mode: Mode,
   ) {}
 
   async getChains(): Promise<Chain[]> {
@@ -50,7 +50,7 @@ export class Patch {
     }
 
     const chains = await Promise["all"](
-      this.hosts.map(async (hostDest) => this.getHostChains(hostDest))
+      this.hosts.map(async (hostDest) => this.getHostChains(hostDest)),
     );
     return flatten(chains);
   }
@@ -64,21 +64,21 @@ export class Patch {
       this.getSchemaChain(
         hostDest.createSchemaDest(schema),
         dbVersions.get(schema)!,
-        reEntries.get(schema)!
-      )
+        reEntries.get(schema)!,
+      ),
     );
     return sortBy(
       chains.filter((chain) => chain && chain.migrations.length > 0) as Chain[],
       (chain) => chain.dest.host,
       (chain) => chain.dest.db,
-      (chain) => chain.dest.schema
+      (chain) => chain.dest.schema,
     );
   }
 
   private getSchemaChain(
     dest: Dest,
     dbVersions: string[],
-    reEntries: Entry[]
+    reEntries: Entry[],
   ): Chain | null {
     try {
       if (!this.mode.undo) {
@@ -94,7 +94,7 @@ export class Patch {
   private getChainUp(
     dest: Dest,
     dbVersions: string[],
-    reEntries: Entry[]
+    reEntries: Entry[],
   ): Chain {
     for (let i = 0; i < reEntries.length; i++) {
       if (i >= dbVersions.length) {
@@ -142,7 +142,7 @@ export class Patch {
     dest: Dest,
     dbVersions: string[],
     reEntries: Entry[],
-    undoVersion: string
+    undoVersion: string,
   ): Chain | null {
     undoVersion = this.registry.extractVersion(undoVersion);
     if (dbVersions[dbVersions.length - 1] === undoVersion) {

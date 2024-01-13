@@ -3,7 +3,7 @@ import type { Vars } from "./extractVars";
 
 export function validateCreateIndexConcurrently(
   content: string,
-  vars: Vars
+  vars: Vars,
 ): string[] {
   content = content
     .replace(/--[^\n]*/gm, "")
@@ -21,11 +21,11 @@ export function validateCreateIndexConcurrently(
     const index = RegExp.$1;
     if (
       !content.match(
-        new RegExp(`DROP INDEX IF EXISTS ${escapeRegExp(index)}`, "is")
+        new RegExp(`DROP INDEX IF EXISTS ${escapeRegExp(index)}`, "is"),
       )
     ) {
       errors.push(
-        `include "DROP INDEX IF EXISTS ${index};" statement before "CREATE INDEX CONCURRENTLY"`
+        `include "DROP INDEX IF EXISTS ${index};" statement before "CREATE INDEX CONCURRENTLY"`,
       );
     }
   }
@@ -38,7 +38,7 @@ export function validateCreateIndexConcurrently(
     ] as const;
     if (!requiredVars.some((k) => !!vars[k])) {
       errors.unshift(
-        "start with one of the following vars: " + requiredVars.join(", ")
+        "start with one of the following vars: " + requiredVars.join(", "),
       );
     }
 
@@ -48,7 +48,7 @@ export function validateCreateIndexConcurrently(
 
     if (!content.match(/\bBEGIN\s*;/is)) {
       errors.push(
-        'end with "BEGIN;" with other optional SQL statements after it'
+        'end with "BEGIN;" with other optional SQL statements after it',
       );
     }
   }

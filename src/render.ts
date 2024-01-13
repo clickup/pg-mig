@@ -22,7 +22,7 @@ export function renderGrid(grid: Grid) {
   for (const worker of sortBy(
     grid.workers,
     (worker) => worker.curDest?.host,
-    (worker) => worker.curDest?.schema
+    (worker) => worker.curDest?.schema,
   )) {
     if (worker.curDest) {
       activeRows.push([
@@ -112,7 +112,7 @@ export function renderPatchSummary(chains: Chain[]): [string, boolean] {
       "Migrations to apply:\n" +
         (rows.length ? rows : ["<no changes>"])
           .map((s) => "  * " + s)
-          .join("\n")
+          .join("\n"),
     ),
     rows.length > 0,
   ];
@@ -131,12 +131,12 @@ export async function renderLatestVersions(dests: Dest[], registry: Registry) {
           .getOrAdd(versions[versions.length - 1] || "", [])
           .push(formatHost(dest.host) + ":" + schema);
       }
-    })
+    }),
   );
   const rows = [];
   for (const [key, dests] of sortBy(
     Array.from(destsGrouped),
-    ([key]) => key
+    ([key]) => key,
   ).reverse()) {
     rows.push(collapse(dests) + ": " + (key || "<no versions>"));
   }

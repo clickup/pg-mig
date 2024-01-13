@@ -21,7 +21,7 @@ export class Psql {
     private dest: Dest,
     private cwd: string,
     args: string[],
-    private stdin: string
+    private stdin: string,
   ) {
     this._args = ["-X", ...args];
     this._cmdline = "psql " + quote(this._args);
