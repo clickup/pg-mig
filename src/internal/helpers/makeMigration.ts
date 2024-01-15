@@ -6,7 +6,7 @@ export async function makeMigration(
   migrationDir: string,
   migrationName: string,
   schemaPrefix: string,
-) {
+): Promise<string[]> {
   const utcTimestamp = moment(Date.now()).utc().format("YYYYMMDDHHmmss");
 
   const migrationFilenameBase = `${utcTimestamp}.${migrationName}.${schemaPrefix}`;

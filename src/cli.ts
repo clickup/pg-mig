@@ -2,11 +2,13 @@ import { basename } from "path";
 import sortBy from "lodash/sortBy";
 import throttle from "lodash/throttle";
 import logUpdate from "log-update";
-import { Dest } from "./Dest";
-import { Grid } from "./Grid";
-import type { Chain } from "./Patch";
-import { Patch } from "./Patch";
-import { Registry } from "./Registry";
+import { Dest } from "./internal/Dest";
+import { Grid } from "./internal/Grid";
+import { Args } from "./internal/helpers/Args";
+import { makeMigration } from "./internal/helpers/makeMigration";
+import type { Chain } from "./internal/Patch";
+import { Patch } from "./internal/Patch";
+import { Registry } from "./internal/Registry";
 import {
   printError,
   printSuccess,
@@ -14,65 +16,94 @@ import {
   renderGrid,
   renderLatestVersions,
   renderPatchSummary,
-} from "./render";
-import { Args } from "./utils/Args";
-import { makeMigration } from "./utils/makeMigration";
+} from "./internal/render";
 
-// Examples:
-// yarn db:migrate --make=space_members_add_email@sh0000
-// yarn db:migrate --undo 20191107201239.space_members.sh0000
-// yarn db:migrate --undo 20191107201238.space_users_remove.sh
-
-export async function main() {
+/**
+ * CLI tool entry point. This function is run when `pg-mig` is called from the
+ * command line. Accepts parameters from process.argv. See `migrate()` for
+ * option names.
+ *
+ * If no options are passed, uses `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`,
+ * `PGDATABASE` environment variables which are standard for e.g. `psql`.
+ *
+ * You can pass multiple hosts separated by comma or semicolon.
+ *
+ * Examples:
+ * ```
+ * pg-mig --make=my-migration-name@sh
+ * pg-mig --make=other-migration-name@sh0000
+ * pg-mig --undo 20191107201239.my-migration-name.sh
+ * pg-mig
+ * ```
+ */
+export async function main(): Promise<boolean> {
   const args = new Args(
     process.argv,
     // Notice that we use --migdir and not --dir, because @mapbox/node-pre-gyp
     // used by bcrypt conflicts with --dir option.
     [
+      "migdir",
       "hosts",
       "port",
       "user",
       "pass",
       "db",
-      "migdir",
-      "parallelism",
       "undo",
       "make",
+      "parallelism",
     ],
     ["dry", "ci", "list"],
   );
   return migrate({
+    migDir: args.get("migdir", process.env["PGMIGDIR"]),
     hosts: args
-      .get("hosts", process.env.PGHOST || "localhost")
+      .get("hosts", process.env["PGHOST"] || "127.0.0.1")
       .split(/[\s,;]+/),
-    port: parseInt(args.get("port", process.env.PGPORT || "5432")),
-    user: args.get("user", process.env.PGUSER || ""),
-    pass: args.get("pass", process.env.PGPASSWORD || ""),
-    db: args.get("db", process.env.PGDATABASE),
-    undo: args.get("undo", "empty"),
+    port: parseInt(args.get("port", process.env["PGPORT"] || "5432")),
+    user: args.get("user", process.env["PGUSER"] || ""),
+    pass: args.get("pass", process.env["PGPASSWORD"] || ""),
+    db: args.get("db", process.env["PGDATABASE"]),
+    undo: args.getOptional("undo"),
+    make: args.getOptional("make"),
+    parallelism: parseInt(args.get("parallelism", "0")) || undefined,
     dry: args.flag("dry"),
     list: args.flag("list"),
-    make: args.get("make", ""),
-    migDir: args.get("migdir"),
-    parallelism: parseInt(args.get("parallelism", "0")) || 10,
     ci: args.flag("ci"),
   });
 }
 
+/**
+ * Similar to main(), but accepts options explicitly, not from process.argv.
+ * This function is meant to be called from other tools.
+ */
 export async function migrate(options: {
-  hosts: string[];
-  port: number;
-  user: string;
-  pass: string;
-  db: string;
-  undo: string;
-  dry: boolean;
-  list: boolean;
-  make: string;
+  /** The directory the migration versions are loaded from. */
   migDir: string;
-  parallelism: number;
-  ci: boolean;
-}) {
+  /** List of PostgreSQL master hostnames. The migration versions in `migDir`
+   * will be applied to all of them. */
+  hosts: string[];
+  /** PostgreSQL port on each hosts. */
+  port: number;
+  /** PostgreSQL user on each host. */
+  user: string;
+  /** PostgreSQL password on each host. */
+  pass: string;
+  /** PostgreSQL database name on each host. */
+  db: string;
+  /** How many schemas to process in parallel (defaults to 10). */
+  parallelism?: number;
+  /** If passed, switches the action to undo the provided migration version. */
+  undo?: string;
+  /** If passed, switches the action to create a new migration version. */
+  make?: string;
+  /** If true, prints what it plans to do, but doesn't change anything. */
+  dry?: boolean;
+  /** Lists all versions in `migDir`. */
+  list?: boolean;
+  /** If true, then doesn't use logUpdate() and doesn't replace lines; instead,
+   * prints logs to stdout line by line. */
+  ci?: boolean;
+}): Promise<boolean> {
   const hostDests = options.hosts.map(
     (host) =>
       new Dest(
@@ -88,11 +119,11 @@ export async function migrate(options: {
 
   printText(`Running on ${options.hosts}:${options.port} ${options.db}`);
 
-  if (options.make) {
+  if (options.make !== undefined) {
     // example: create_table_x@sh
     const [migrationName, schemaPrefix] = options.make.split("@");
-
     const usage = "Format: --make=migration_name@schema_prefix";
+
     if (!migrationName?.match(/^[a-z0-9_]+$/)) {
       printError("migration_name is missing or incorrect");
       printText(usage);
@@ -143,9 +174,7 @@ export async function migrate(options: {
     return false;
   }
 
-  const patch = new Patch(hostDests, registry, {
-    undo: options.undo !== "empty" ? options.undo : undefined,
-  });
+  const patch = new Patch(hostDests, registry, { undo: options.undo });
   const chains = await patch.getChains();
 
   const [summary, hasWork] = renderPatchSummary(chains);
@@ -183,7 +212,12 @@ export async function migrate(options: {
         ],
       }))
     : [];
-  const grid = new Grid(chains, options.parallelism, beforeChains, afterChains);
+  const grid = new Grid(
+    chains,
+    options.parallelism ?? 10,
+    beforeChains,
+    afterChains,
+  );
 
   const success = await grid.run(
     throttle(() => {

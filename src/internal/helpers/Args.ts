@@ -13,16 +13,20 @@ export class Args<TStringArgs extends string, TFlagArgs extends string> {
     });
   }
 
+  getOptional(name: TStringArgs): string | undefined {
+    return this.args[name];
+  }
+
   get(name: TStringArgs, def?: string): string {
     const v = this.args[name] !== undefined ? this.args[name] : def;
     if (v === undefined) {
-      throw "Parameter " + name + " is missing";
+      throw `Parameter ${name} is missing`;
     }
 
     return v;
   }
 
-  flag(name: TFlagArgs) {
+  flag(name: TFlagArgs): boolean {
     return !!this.args[name];
   }
 }

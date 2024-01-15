@@ -20,7 +20,7 @@ export class Dest {
   /**
    * Returns a Dest switched to a different schema.
    */
-  createSchemaDest(schema: string) {
+  createSchemaDest(schema: string): Dest {
     return new Dest(
       this.host,
       this.port,
@@ -34,7 +34,7 @@ export class Dest {
   /**
    * Returns a human-readable representation of the dest.
    */
-  toString() {
+  toString(): string {
     return this.host + ":" + this.schema;
   }
 
@@ -46,7 +46,7 @@ export class Dest {
     file: string,
     newVersions: string[] | null,
     onOut: (proc: Psql) => void = () => {},
-  ) {
+  ): Promise<Psql> {
     const psql = new Psql(
       this,
       dirname(file),
@@ -97,7 +97,7 @@ export class Dest {
   /**
    * Returns all the shard-like schemas from the DB.
    */
-  async loadSchemas() {
+  async loadSchemas(): Promise<string[]> {
     return this.queryCol(
       "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE '%\\_%'",
     );
@@ -107,9 +107,11 @@ export class Dest {
    * Given a list of schemas, extracts versions for each schema
    * (which is a list of migration names).
    */
-  async loadVersionsBySchema(schemas: string[]) {
+  async loadVersionsBySchema(
+    schemas: string[],
+  ): Promise<Map<string, string[]>> {
     if (!schemas.length) {
-      return new Map<string, string[]>();
+      return new Map();
     }
 
     const inClause = schemas.map((v) => this.escape(v)).join(", ");
@@ -139,7 +141,7 @@ export class Dest {
   /**
    * SQL value quoting.
    */
-  private escape(v: string) {
+  private escape(v: string): string {
     return "'" + ("" + v).replace(/'/g, "''") + "'";
   }
 

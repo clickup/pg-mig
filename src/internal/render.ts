@@ -2,10 +2,10 @@ import chalk from "chalk";
 import sortBy from "lodash/sortBy";
 import type { Dest } from "./Dest";
 import type { Grid } from "./Grid";
+import { collapse } from "./helpers/collapse";
+import { DefaultMap } from "./helpers/DefaultMap";
 import type { Chain } from "./Patch";
 import type { Registry } from "./Registry";
-import { collapse } from "./utils/collapse";
-import { DefaultMap } from "./utils/DefaultMap";
 
 const Table = require("table-layout");
 
@@ -16,7 +16,7 @@ const TABLE_OPTIONS = {
   maxWidth: process.stdout.columns - 2,
 };
 
-export function renderGrid(grid: Grid) {
+export function renderGrid(grid: Grid): string {
   const activeRows: string[][] = [];
   const errorRows: string[][] = [];
   for (const worker of sortBy(
@@ -118,7 +118,10 @@ export function renderPatchSummary(chains: Chain[]): [string, boolean] {
   ];
 }
 
-export async function renderLatestVersions(dests: Dest[], registry: Registry) {
+export async function renderLatestVersions(
+  dests: Dest[],
+  registry: Registry,
+): Promise<string> {
   const destsGrouped = new DefaultMap<string, string[]>();
   await Promise["all"](
     dests.map(async (dest) => {
@@ -147,19 +150,19 @@ export async function renderLatestVersions(dests: Dest[], registry: Registry) {
   );
 }
 
-export function printText(text: string) {
+export function printText(text: string): void {
   // eslint-disable-next-line no-console
   return console.log(text);
 }
 
-export function printSuccess(text: string) {
+export function printSuccess(text: string): void {
   return printText(chalk.green("" + text));
 }
 
-export function printError(error: any) {
+export function printError(error: unknown): void {
   return printText(chalk.red("Error: " + error));
 }
 
-function formatHost(host: string) {
+function formatHost(host: string): string {
   return host.match(/^\d+\.\d+\.\d+\.\d+$/) ? host : host.replace(/\..*/, "");
 }

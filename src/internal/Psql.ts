@@ -27,27 +27,27 @@ export class Psql {
     this._cmdline = "psql " + quote(this._args);
   }
 
-  get code() {
+  get code(): number | null {
     return this._code;
   }
 
-  get stdout() {
+  get stdout(): string {
     return this._stdout;
   }
 
-  get stderr() {
+  get stderr(): string {
     return this._stderr;
   }
 
-  get out() {
+  get out(): string {
     return this._out;
   }
 
-  get cmdline() {
+  get cmdline(): string {
     return this._cmdline;
   }
 
-  get lastOutLine() {
+  get lastOutLine(): string {
     let pos = this._out.lastIndexOf("\n");
     let end = this._out.length;
     // Find the 1st non-empty line scanning backward.
@@ -71,7 +71,7 @@ export class Psql {
           PGUSER: this.dest.user,
           PGPASSWORD: this.dest.pass,
           PGDATABASE: this.dest.db,
-          PATH: process.env.PATH,
+          PATH: process.env["PATH"],
         },
       });
 

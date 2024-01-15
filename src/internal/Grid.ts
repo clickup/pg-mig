@@ -213,7 +213,10 @@ class Worker {
     }
   }
 
-  private async acquireSemaphore(maxWorkers: number, key: string) {
+  private async acquireSemaphore(
+    maxWorkers: number,
+    key: string,
+  ): Promise<() => void> {
     let semaphore = this.semaphores[key];
     if (!semaphore) {
       semaphore = this.semaphores[key] = new Semaphore(maxWorkers);

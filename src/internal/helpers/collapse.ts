@@ -1,7 +1,7 @@
 import { multirange } from "multi-integer-range";
 import { DefaultMap } from "./DefaultMap";
 
-export function collapse(list: string[]) {
+export function collapse(list: string[]): string[] {
   const res = [];
   const numberSuffixes = new DefaultMap<string, number[]>();
   for (const s of list.sort()) {

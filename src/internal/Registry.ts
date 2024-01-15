@@ -1,9 +1,9 @@
 import { existsSync, lstatSync, readdirSync, readFileSync } from "fs";
 import { basename } from "path";
 import sortBy from "lodash/sortBy";
-import { DefaultMap } from "./utils/DefaultMap";
-import { extractVars } from "./utils/extractVars";
-import { validateCreateIndexConcurrently } from "./utils/validateCreateIndexConcurrently";
+import { DefaultMap } from "./helpers/DefaultMap";
+import { extractVars } from "./helpers/extractVars";
+import { validateCreateIndexConcurrently } from "./helpers/validateCreateIndexConcurrently";
 
 /**
  * One migration file (either *.up.* or *.dn.*).
@@ -83,7 +83,7 @@ export class Registry {
     );
   }
 
-  get prefixes() {
+  get prefixes(): string[] {
     return Array.from(this.entriesByPrefix.keys());
   }
 
@@ -123,24 +123,24 @@ export class Registry {
     return entriesBySchema;
   }
 
-  getVersions() {
+  getVersions(): string[] {
     return [...this.versions];
   }
 
-  hasVersion(version: string) {
+  hasVersion(version: string): boolean {
     return this.versions.has(version);
   }
 
-  extractVersion(name: string) {
+  extractVersion(name: string): string {
     const matches = name.match(/^\d+\.[^.]+\.[^.]+/);
     return matches ? matches[0] : name;
   }
 }
 
-function schemaNameMatchesPrefix(schema: string, prefix: string) {
+function schemaNameMatchesPrefix(schema: string, prefix: string): boolean {
   return (
     schema.startsWith(prefix) &&
-    schema.substring(prefix.length).match(/^(\d|$)/s)
+    !!schema.substring(prefix.length).match(/^(\d|$)/s)
   );
 }
 
