@@ -1,18 +1,31 @@
 {
   "name": "@clickup/pg-mig",
   "description": "PostgreSQL schema migration tool with micro-sharding and clustering support",
-  "version": "2.10.296",
+  "version": "2.10.297",
   "license": "MIT",
+  "keywords": [
+    "postgresql",
+    "postgres",
+    "database",
+    "schema",
+    "migration",
+    "micro-sharding",
+    "clustering",
+    "DDL",
+    "psql",
+    "database-versioning",
+    "schema-versioning"
+  ],
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
   "bin": {
     "pg-mig": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch --preserveWatchOutput",
+    "build": "bash internal/build.sh",
+    "dev": "bash internal/dev.sh",
     "lint": "bash internal/lint.sh",
-    "test": "jest",
+    "test": "bash internal/test.sh",
     "docs": "bash internal/docs.sh",
     "clean": "bash internal/clean.sh",
     "copy-package-to-public-dir": "copy-package-to-public-dir.sh",
@@ -44,6 +57,7 @@
     "eslint-import-resolver-typescript": "^3.5.5",
     "eslint-plugin-import": "^2.27.5",
     "eslint-plugin-lodash": "^7.4.0",
+    "eslint-plugin-no-only-tests": "^3.1.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react": "^7.32.2",

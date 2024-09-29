@@ -16,7 +16,7 @@ const TABLE_OPTIONS = {
   maxWidth: process.stdout.columns - 2,
 };
 
-export function renderGrid(grid: Grid): string {
+export function renderGrid(grid: Grid): string[] {
   const activeRows: string[][] = [];
   const errorRows: string[][] = [];
   for (const worker of sortBy(
@@ -73,7 +73,7 @@ export function renderGrid(grid: Grid): string {
         " migrations/s"
       : "";
 
-  return (
+  const text =
     (activeRows.length > 0
       ? "Running: " +
         [
@@ -87,11 +87,11 @@ export function renderGrid(grid: Grid): string {
         "\n" +
         table1.toString() +
         "\n"
-      : "") + (errorRows.length > 0 ? table2.toString().trimEnd() + "\n" : "")
-  );
+      : "") + (errorRows.length > 0 ? table2.toString().trimEnd() + "\n" : "");
+  return text.split("\n").filter(Boolean);
 }
 
-export function renderPatchSummary(chains: Chain[]): [string, boolean] {
+export function renderPatchSummary(chains: Chain[]): string {
   const destsGrouped = new DefaultMap<string, string[]>();
   for (const chain of chains) {
     const key =
@@ -107,15 +107,10 @@ export function renderPatchSummary(chains: Chain[]): [string, boolean] {
     rows.push(collapse(dests) + ": " + key);
   }
 
-  return [
-    chalk.yellow(
-      "Migrations to apply:\n" +
-        (rows.length ? rows : ["<no changes>"])
-          .map((s) => "  * " + s)
-          .join("\n"),
-    ),
-    rows.length > 0,
-  ];
+  return chalk.yellow(
+    "Migrations to apply:\n" +
+      (rows.length ? rows : ["<no changes>"]).map((s) => "  * " + s).join("\n"),
+  );
 }
 
 export async function renderLatestVersions(

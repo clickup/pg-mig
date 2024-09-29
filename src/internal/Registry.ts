@@ -3,6 +3,7 @@ import { basename } from "path";
 import sortBy from "lodash/sortBy";
 import { DefaultMap } from "./helpers/DefaultMap";
 import { extractVars } from "./helpers/extractVars";
+import { schemaNameMatchesPrefix } from "./helpers/schemaNameMatchesPrefix";
 import { validateCreateIndexConcurrently } from "./helpers/validateCreateIndexConcurrently";
 
 /**
@@ -106,13 +107,8 @@ export class Registry {
           }
 
           throw (
-            "Schema " +
-            schema +
-            " matches more than one migration prefix (" +
-            entriesBySchema.get(schema)![0].schemaPrefix +
-            " and " +
-            schemaPrefix +
-            ")"
+            `Schema ${schema} matches more than one migration prefix ` +
+            `(${prevPrefix} and ${schemaPrefix})`
           );
         }
 
@@ -135,13 +131,6 @@ export class Registry {
     const matches = name.match(/^\d+\.[^.]+\.[^.]+/);
     return matches ? matches[0] : name;
   }
-}
-
-function schemaNameMatchesPrefix(schema: string, prefix: string): boolean {
-  return (
-    schema.startsWith(prefix) &&
-    !!schema.substring(prefix.length).match(/^(\d|$)/s)
-  );
 }
 
 function buildFile(fileName: string): File {

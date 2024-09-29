@@ -2,6 +2,10 @@
 
 # @clickup/pg-mig
 
+## Interfaces
+
+- [MigrateOptions](interfaces/MigrateOptions.md)
+
 ## Functions
 
 ### main
@@ -31,7 +35,7 @@ pg-mig
 
 #### Defined in
 
-[src/cli.ts:39](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L39)
+[src/cli.ts:72](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L72)
 
 ___
 
@@ -44,21 +48,9 @@ This function is meant to be called from other tools.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options` | `Object` | - |
-| `options.migDir` | `string` | The directory the migration versions are loaded from. |
-| `options.hosts` | `string`[] | List of PostgreSQL master hostnames. The migration versions in `migDir` will be applied to all of them. |
-| `options.port` | `number` | PostgreSQL port on each hosts. |
-| `options.user` | `string` | PostgreSQL user on each host. |
-| `options.pass` | `string` | PostgreSQL password on each host. |
-| `options.db` | `string` | PostgreSQL database name on each host. |
-| `options.parallelism?` | `number` | How many schemas to process in parallel (defaults to 10). |
-| `options.undo?` | `string` | If passed, switches the action to undo the provided migration version. |
-| `options.make?` | `string` | If passed, switches the action to create a new migration version. |
-| `options.dry?` | `boolean` | If true, prints what it plans to do, but doesn't change anything. |
-| `options.list?` | `boolean` | Lists all versions in `migDir`. |
-| `options.ci?` | `boolean` | If true, then doesn't use logUpdate() and doesn't replace lines; instead, prints logs to stdout line by line. |
+| Name | Type |
+| :------ | :------ |
+| `options` | [`MigrateOptions`](interfaces/MigrateOptions.md) |
 
 #### Returns
 
@@ -66,4 +58,4 @@ This function is meant to be called from other tools.
 
 #### Defined in
 
-[src/cli.ts:79](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L79)
+[src/cli.ts:117](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L117)

@@ -122,16 +122,16 @@ export class Patch {
           reEntries[i].name +
           ", although version " +
           dbVersions[i] +
-          " has already been applied"
+          " has already been applied. Hint: make sure that you've rebased on top of the main branch, and new migration versions are still the most recent."
         );
       }
     }
 
     if (dbVersions.length > reEntries.length) {
       throw (
-        "version " +
+        "Version " +
         dbVersions[reEntries.length] +
-        " exists in the DB, but is missing on disk"
+        " exists in the DB, but is missing on disk. Hint: make sure you've rebased on top of the main branch."
       );
     }
 
