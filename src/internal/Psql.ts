@@ -3,6 +3,12 @@ import { quote } from "shell-quote";
 import type { Dest } from "./Dest";
 
 /**
+ * A tag which is expected to be echoed right after the migration file is
+ * applied. This is for better output (an optional thing).
+ */
+export const MIGRATION_VERSION_APPLIED = "MIGRATION_VERSION_APPLIED";
+
+/**
  * A wrapper for running psql.
  *
  * Keeps track on stdout/stderr (and both), also allows to trigger
@@ -23,7 +29,11 @@ export class Psql {
     args: string[],
     private stdin: string,
   ) {
-    this._args = ["-X", ...args];
+    this._args = [
+      "-X", // do not read psqlrc
+      "-vON_ERROR_STOP=1", // if it fails, then exit code will be nonzero
+      ...args,
+    ];
     this._cmdline = "psql " + quote(this._args);
   }
 
@@ -48,16 +58,17 @@ export class Psql {
   }
 
   get lastOutLine(): string {
-    let pos = this._out.lastIndexOf("\n");
-    let end = this._out.length;
+    const end = this._out.lastIndexOf(`\n${MIGRATION_VERSION_APPLIED}\n`);
+    const out = end >= 0 ? this._out.substring(0, end + 1) : this._out;
+    let posNewline1 = out.lastIndexOf("\n");
+    let posNewline2 = out.length;
     // Find the 1st non-empty line scanning backward.
-    while (pos >= 0 && pos === end - 1) {
-      end = pos;
-      pos = this._out.lastIndexOf("\n", end - 1);
+    while (posNewline1 >= 0 && posNewline1 + 1 === posNewline2) {
+      posNewline2 = posNewline1;
+      posNewline1 = out.lastIndexOf("\n", posNewline2 - 1);
     }
 
-    const line = this._out.substring(pos + 1, end).trimEnd();
-    return line;
+    return out.substring(posNewline1 + 1, posNewline2).trimEnd();
   }
 
   async run(onOut: (proc: this) => void = () => {}): Promise<this> {
@@ -71,7 +82,13 @@ export class Psql {
           PGUSER: this.dest.user,
           PGPASSWORD: this.dest.pass,
           PGDATABASE: this.dest.db,
-          PATH: process.env["PATH"],
+          // Remove node_modules from PATH to force pg-mig use the "vanilla"
+          // psql tool, even if the package manager overrides it. This is for
+          // performance, and also, we are not meant to use a non-vanilla psql.
+          PATH: (process.env["PATH"] ?? "")
+            .split(":")
+            .filter((p) => !p.includes("/node_modules/"))
+            .join(":"),
         },
       });
 

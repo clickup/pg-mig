@@ -1,10 +1,15 @@
+import crypto from "crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "fs";
 import { basename } from "path";
+import partition from "lodash/partition";
 import sortBy from "lodash/sortBy";
 import { DefaultMap } from "./helpers/DefaultMap";
 import { extractVars } from "./helpers/extractVars";
 import { schemaNameMatchesPrefix } from "./helpers/schemaNameMatchesPrefix";
 import { validateCreateIndexConcurrently } from "./helpers/validateCreateIndexConcurrently";
+
+// Must be lexicographically less than "0".
+const DIGEST_SEP = ".";
 
 /**
  * One migration file (either *.up.* or *.dn.*).
@@ -84,6 +89,30 @@ export class Registry {
     );
   }
 
+  static chooseBestDigest(values: string[]): string {
+    const [digests, resets] = partition(values, (digest) =>
+      digest.includes(DIGEST_SEP),
+    );
+
+    // If we have at least one real digest, then use the highest one. It means
+    // that the database is at least at that migration, since we save all
+    // digests after successful migration process, when it succeeds everywhere.
+    if (digests.length > 0) {
+      return sortBy(digests).reverse()[0];
+    }
+
+    // If no real digests are provided, then someone initiated an undo. We
+    // proceed with DB migration process only when we're sure that we saved undo
+    // signal to ALL databases, so we can be sure that, even if undo fails, ALL
+    // DBs will have that reset digest saved in.
+    if (resets.length > 0) {
+      return "0" + DIGEST_SEP + sortBy(resets)[0];
+    }
+
+    // No digests at all passed to the function.
+    return "0";
+  }
+
   get prefixes(): string[] {
     return Array.from(this.entriesByPrefix.keys());
   }
@@ -130,6 +159,20 @@ export class Registry {
   extractVersion(name: string): string {
     const matches = name.match(/^\d+\.[^.]+\.[^.]+/);
     return matches ? matches[0] : name;
+  }
+
+  getDigest(): string {
+    const versions = sortBy(this.getVersions());
+    const lastOrder = versions[versions.length - 1]?.match(/^(\d+)/)
+      ? RegExp.$1
+      : versions.length > 0
+        ? versions[versions.length - 1]
+        : "0";
+    return (
+      lastOrder +
+      DIGEST_SEP +
+      crypto.createHash("sha256").update(versions.join("\n")).digest("hex")
+    );
   }
 }
 

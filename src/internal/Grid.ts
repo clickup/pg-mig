@@ -1,8 +1,8 @@
-import { Semaphore } from "await-semaphore";
 import groupBy from "lodash/groupBy";
 import sum from "lodash/sum";
-import type { Dest } from "./Dest";
-import type { Chain, Migration } from "./Patch";
+import { promiseAllMap } from "./helpers/promiseAllMap";
+import type { Chain } from "./Patch";
+import { Worker } from "./Worker";
 
 /**
  * A fixed set of Workers running the migration chains.
@@ -13,10 +13,10 @@ export class Grid {
   private _startTime: number = 0;
 
   constructor(
-    private chains: Chain[],
-    private workersPerHost: number,
-    private beforeChains: Chain[] = [],
-    private afterChains: Chain[] = [],
+    public readonly chains: Chain[],
+    public readonly workersPerHost: number,
+    public readonly beforeChains: Chain[] = [],
+    public readonly afterChains: Chain[] = [],
   ) {}
 
   get workers(): readonly Worker[] {
@@ -54,15 +54,13 @@ export class Grid {
   async run(onChange: () => void = () => {}): Promise<boolean> {
     this._startTime = Date.now();
 
-    // "Before" sequence. Runs in parallel on all hosts; if we fail, don't even
-    // start the migrations.
-    for (const chain of this.beforeChains) {
-      this._workers.push(new Worker([chain], {}));
-    }
-
-    await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange)),
+    // "Before" sequence. Runs in parallel on all hosts (even on those that
+    // don't have any new migration versions). If we fail, don't even start the
+    // migrations.
+    this._workers.push(
+      ...this.beforeChains.map((chain) => new Worker([chain], {})),
     );
+    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
     if (this.numErrors) {
       return false;
     }
@@ -73,6 +71,9 @@ export class Grid {
     const semaphores = {};
     const chainsByHost = groupBy(this.chains, (entry) => entry.dest.host);
     for (const chainsQueue of Object.values(chainsByHost)) {
+      // For each one host, start as many workers as independent chains we have
+      // in chainsQueue, but not more than this.workersPerHost. Each worker will
+      // pick up jobs (chains) from the shared chainsQueue then.
       for (
         let i = 0;
         i < Math.min(chainsQueue.length, this.workersPerHost);
@@ -86,19 +87,14 @@ export class Grid {
       );
     }
 
-    await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange)),
-    );
+    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
 
-    // "After" sequence (we run it even on errors above). We don't clear
-    // this._workers here, because we want to keep the history of errors.
-    for (const chain of this.afterChains) {
-      this._workers.push(new Worker([chain], {}));
-    }
-
-    await Promise["all"](
-      this._workers.map(async (worker) => worker.run(onChange)),
+    // "After" sequence (we run it even on errors above). Runs on all hosts. We
+    // don't clear this._workers here: we want to keep the history of errors.
+    this._workers.push(
+      ...this.afterChains.map((chain) => new Worker([chain], {})),
     );
+    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
     if (this.numErrors) {
       return false;
     }
@@ -106,128 +102,4 @@ export class Grid {
     // All done.
     return this.numErrors === 0;
   }
-}
-
-class Worker {
-  private _succeededMigrations: number = 0;
-  private _errorMigrations: MigrationError[] = [];
-  private _curDest: Dest | null = null;
-  private _curMigration: Migration | null = null;
-  private _curLine: string | null = null;
-
-  constructor(
-    private chainsQueue: Chain[],
-    private semaphores: Record<string, Semaphore>,
-  ) {}
-
-  get succeededMigrations(): number {
-    return this._succeededMigrations;
-  }
-
-  get errorMigrations(): readonly MigrationError[] {
-    return this._errorMigrations;
-  }
-
-  get curDest(): Readonly<Dest> | null {
-    return this._curDest;
-  }
-
-  get curMigration(): Readonly<Migration> | null {
-    return this._curMigration;
-  }
-
-  get curLine(): string | null {
-    return this._curLine;
-  }
-
-  async run(onChange: () => void): Promise<void> {
-    while (this.chainsQueue.length > 0) {
-      const chain = this.chainsQueue.shift()!;
-      for (const migration of chain.migrations) {
-        this._curDest = chain.dest;
-        this._curMigration = migration;
-        onChange();
-        const interval = setInterval(() => onChange(), 200); // for long-running migrations
-        try {
-          await this.processMigration(chain.dest, migration);
-          this._succeededMigrations++;
-        } catch (error: unknown) {
-          this._errorMigrations.push({
-            dest: chain.dest,
-            migration,
-            error,
-          });
-          break;
-        } finally {
-          this._curMigration = null;
-          this._curDest = null;
-          clearInterval(interval);
-        }
-      }
-
-      this._curLine = null;
-    }
-
-    onChange();
-  }
-
-  private async processMigration(
-    dest: Dest,
-    migration: Migration,
-  ): Promise<void> {
-    this._curLine = "waiting to satisfy parallelism limits...";
-    const releases = await Promise["all"]([
-      this.acquireSemaphore(
-        migration.file.runAlone ? 1 : Number.POSITIVE_INFINITY,
-        "alone",
-      ),
-      this.acquireSemaphore(
-        migration.file.parallelismGlobal,
-        migration.version,
-      ),
-      this.acquireSemaphore(
-        migration.file.parallelismPerHost,
-        dest.host + ":" + migration.version,
-      ),
-    ]);
-    try {
-      this._curLine = null;
-      const res = await dest.runFile(
-        migration.file.fileName,
-        migration.newVersions,
-        (proc) => {
-          this._curLine = proc.lastOutLine;
-        },
-      );
-      if (res.code) {
-        throw res.out.trimEnd();
-      }
-
-      if (migration.file.delay > 0) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, migration.file.delay),
-        );
-      }
-    } finally {
-      releases.forEach((release) => release());
-    }
-  }
-
-  private async acquireSemaphore(
-    maxWorkers: number,
-    key: string,
-  ): Promise<() => void> {
-    let semaphore = this.semaphores[key];
-    if (!semaphore) {
-      semaphore = this.semaphores[key] = new Semaphore(maxWorkers);
-    }
-
-    return semaphore.acquire();
-  }
-}
-
-interface MigrationError {
-  dest: Dest;
-  migration: Migration;
-  error: any;
 }

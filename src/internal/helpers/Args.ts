@@ -3,8 +3,8 @@ import minimist from "minimist";
 export class Args<TStringArgs extends string, TFlagArgs extends string> {
   private args: minimist.ParsedArgs;
 
-  constructor(argv: string[], strings: TStringArgs[], flags: TFlagArgs[]) {
-    this.args = minimist(argv.slice(2), {
+  constructor(argsIn: string[], strings: TStringArgs[], flags: TFlagArgs[]) {
+    this.args = minimist(argsIn, {
       string: strings,
       boolean: flags,
       unknown: (arg) => {

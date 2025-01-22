@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 import { basename } from "path";
+import compact from "lodash/compact";
+import mapValues from "lodash/mapValues";
+import pickBy from "lodash/pickBy";
 import sortBy from "lodash/sortBy";
-import throttle from "lodash/throttle";
-import logUpdate from "log-update";
 import { Dest } from "./internal/Dest";
 import { Grid } from "./internal/Grid";
 import { Args } from "./internal/helpers/Args";
 import { makeMigration } from "./internal/helpers/makeMigration";
+import { promiseAllMap } from "./internal/helpers/promiseAllMap";
+import { readConfigs } from "./internal/helpers/readConfigs";
 import type { Chain } from "./internal/Patch";
 import { Patch } from "./internal/Patch";
+import {
+  ProgressPrinterStream,
+  ProgressPrinterTTY,
+} from "./internal/ProgressPrinter";
 import { Registry } from "./internal/Registry";
 import {
   printError,
@@ -18,6 +25,8 @@ import {
   renderLatestVersions,
   renderPatchSummary,
 } from "./internal/render";
+
+const MIN_TTY_ROWS = 5;
 
 /**
  * Options for the migrate() function.
@@ -36,19 +45,20 @@ export interface MigrateOptions {
   pass: string;
   /** PostgreSQL database name on each host. */
   db: string;
+  /** If true, tries to create the given database. This is helpful when running
+   * the tool on a developer's machine. */
+  createDB?: boolean;
   /** How many schemas to process in parallel (defaults to 10). */
   parallelism?: number;
   /** If true, prints what it plans to do, but doesn't change anything. */
   dry?: boolean;
-  /** If true, then doesn't use log-update and doesn't replace lines; instead,
-   * prints logs to stdout line by line. */
-  ci?: boolean;
   /** What to do. */
   action:
     | { type: "make"; name: string }
     | { type: "list" }
+    | { type: "digest" }
     | { type: "undo"; version: string }
-    | { type: "apply" };
+    | { type: "apply"; after?: Array<() => void | Promise<void>> };
 }
 
 /**
@@ -65,16 +75,18 @@ export interface MigrateOptions {
  * ```
  * pg-mig --make=my-migration-name@sh
  * pg-mig --make=other-migration-name@sh0000
- * pg-mig --undo 20191107201239.my-migration-name.sh
+ * pg-mig --undo=20191107201239.my-migration-name.sh
+ * pg-mig --list
+ * pg-mig --list=digest
  * pg-mig
  * ```
  */
-export async function main(): Promise<boolean> {
+export async function main(argsIn: string[]): Promise<boolean> {
   const args = new Args(
-    process.argv,
-    // Notice that we use --migdir and not --dir, because @mapbox/node-pre-gyp
-    // used by bcrypt conflicts with --dir option.
+    argsIn,
     [
+      // We use --migdir and not --dir, because @mapbox/node-pre-gyp used by
+      // bcrypt conflicts with --dir option.
       "migdir",
       "hosts",
       "port",
@@ -83,10 +95,44 @@ export async function main(): Promise<boolean> {
       "db",
       "undo",
       "make",
+      "list",
       "parallelism",
     ],
-    ["dry", "ci", "list"],
+    ["dry", "createdb"],
   );
+
+  const action: MigrateOptions["action"] =
+    args.getOptional("make") !== undefined
+      ? { type: "make", name: args.get("make") }
+      : args.getOptional("list") === ""
+        ? { type: "list" }
+        : args.getOptional("list") === "digest"
+          ? { type: "digest" }
+          : args.getOptional("undo") !== undefined
+            ? { type: "undo", version: args.get("undo") }
+            : { type: "apply", after: [] };
+
+  for (const config of await readConfigs("pg-mig.config", action.type)) {
+    Object.assign(
+      process.env,
+      mapValues(
+        pickBy(
+          config,
+          (v) =>
+            typeof v === "string" ||
+            typeof v === "number" ||
+            typeof v === "boolean",
+        ),
+        String,
+      ),
+    );
+    if (action.type === "apply") {
+      if ("after" in config && typeof config.after === "function") {
+        action.after!.push(config.after as () => void | Promise<void>);
+      }
+    }
+  }
+
   return migrate({
     migDir: args.get("migdir", process.env["PGMIGDIR"]),
     hosts: args
@@ -96,17 +142,14 @@ export async function main(): Promise<boolean> {
     user: args.get("user", process.env["PGUSER"] || ""),
     pass: args.get("pass", process.env["PGPASSWORD"] || ""),
     db: args.get("db", process.env["PGDATABASE"]),
+    createDB:
+      args.flag("createdb") ||
+      ![undefined, null, "", "0", "false", "undefined", "null", "no"].includes(
+        process.env["PGCREATEDB"],
+      ),
     parallelism: parseInt(args.get("parallelism", "0")) || undefined,
     dry: args.flag("dry"),
-    ci: args.flag("ci"),
-    action:
-      args.getOptional("make") !== undefined
-        ? { type: "make", name: args.get("make") }
-        : args.flag("list")
-          ? { type: "list" }
-          : args.getOptional("undo") !== undefined
-            ? { type: "undo", version: args.get("undo") }
-            : { type: "apply" },
+    action,
   });
 }
 
@@ -116,6 +159,10 @@ export async function main(): Promise<boolean> {
  */
 export async function migrate(options: MigrateOptions): Promise<boolean> {
   const registry = new Registry(options.migDir);
+
+  if (options.action.type === "digest") {
+    return actionDigest(options, registry);
+  }
 
   printText(`Running on ${options.hosts}:${options.port} ${options.db}`);
 
@@ -129,10 +176,37 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
 
   while (true) {
     const { success, hasMoreWork } = await actionUndoOrApply(options, registry);
+
+    if (
+      !options.dry &&
+      options.action.type === "apply" &&
+      success &&
+      !hasMoreWork
+    ) {
+      for (const after of options.action.after ?? []) {
+        await after();
+      }
+    }
+
     if (!success || !hasMoreWork) {
       return success;
     }
   }
+}
+
+/**
+ * Loads the digest strings from the provided databases and chooses the one
+ * which reflects the database schema status the best.
+ */
+export async function loadDBDigest<TDest>(
+  dests: TDest[],
+  sqlRunner: (
+    dest: TDest,
+    sql: string,
+  ) => Promise<Array<Record<string, string>>>,
+): Promise<string> {
+  const digests = await Dest.loadDigests(dests, sqlRunner);
+  return Registry.chooseBestDigest(digests);
 }
 
 /**
@@ -146,8 +220,8 @@ async function actionMake(
   const [migrationName, schemaPrefix] = name.split("@");
   const usage = "Format: --make=migration_name@schema_prefix";
 
-  if (!migrationName?.match(/^[a-z0-9_]+$/)) {
-    printError("migration_name is missing or incorrect");
+  if (!migrationName?.match(/^[-a-z0-9_]+$/)) {
+    printError("migration_name is missing or includes incorrect characters");
     printText(usage);
     return false;
   }
@@ -167,7 +241,7 @@ async function actionMake(
     }
   }
 
-  printText("\nMaking migration files...");
+  printText("Making migration files...");
   const createdFiles = await makeMigration(
     options.migDir,
     migrationName,
@@ -197,23 +271,46 @@ async function actionList(
 }
 
 /**
+ * Prints the "code digest", of all migration version names on disk. Digest is a
+ * string, and those strings can be compared lexicographically to determine
+ * whether the code version is compatible with the DB version: if the DB's
+ * digest is greater or equal to the code's digest, then they are compatible, so
+ * the code can be deployed.
+ */
+async function actionDigest(
+  _options: MigrateOptions,
+  registry: Registry,
+): Promise<boolean> {
+  printText(registry.getDigest());
+  return true;
+}
+
+/**
  * Applies or undoes migrations.
  */
 async function actionUndoOrApply(
   options: MigrateOptions,
   registry: Registry,
 ): Promise<{ success: boolean; hasMoreWork: boolean }> {
+  const digest = registry.getDigest();
   const hostDests = options.hosts.map(
     (host) =>
-      new Dest(
-        host,
-        options.port,
-        options.user,
-        options.pass,
-        options.db,
-        "public",
-      ),
+      new Dest(host, options.port, options.user, options.pass, options.db),
   );
+
+  if (options.action.type === "apply" && options.createDB) {
+    await promiseAllMap(hostDests, async (dest) =>
+      dest
+        .createDB(() =>
+          printText(`PostgreSQL host ${dest.host} is not yet up; waiting...`),
+        )
+        .then(
+          (status) =>
+            status === "created" &&
+            printText(`Database ${dest.db} did not exist; created.`),
+        ),
+    );
+  }
 
   if (options.action.type === "undo" && !options.action.version) {
     printText(await renderLatestVersions(hostDests, registry));
@@ -226,93 +323,130 @@ async function actionUndoOrApply(
   });
   const chains = await patch.getChains();
 
-  const summary = renderPatchSummary(chains);
-  if (chains.length === 0 || options.dry) {
+  // If we are going to undo something, reset the digest in the DB before
+  // running the down migrations, so if we fail partially, the digest in the DB
+  // will be reset.
+  if (options.action.type === "undo" && chains.length > 0 && !options.dry) {
+    await Dest.saveDigests(hostDests, { reset: "before-undo" });
+  }
+
+  const beforeAfterFiles = compact([
+    registry.beforeFile?.fileName,
+    registry.afterFile?.fileName,
+  ]);
+
+  if (
+    chains.length === 0 &&
+    (await Dest.checkRerunFingerprint(hostDests, beforeAfterFiles))
+  ) {
+    // If we have nothing to apply, save the digest in case it was not saved
+    // previously, to keep the invariant.
+    if (options.action.type === "apply" && !options.dry) {
+      await Dest.saveDigests(hostDests, { digest });
+    }
+
     printText(await renderLatestVersions(hostDests, registry));
-    printText(summary);
+    printText(renderPatchSummary(chains, []));
+    printSuccess("Nothing to do.");
     return { success: true, hasMoreWork: false };
   }
 
-  printText(summary);
+  if (options.dry) {
+    printText(await renderLatestVersions(hostDests, registry));
+    printText(renderPatchSummary(chains, beforeAfterFiles));
+    printSuccess("Dry-run mode.");
+    return { success: true, hasMoreWork: false };
+  } else {
+    printText(renderPatchSummary(chains, beforeAfterFiles));
+  }
 
-  const beforeChains: Chain[] = registry.beforeFile
-    ? hostDests.map((dest) => ({
-        type: "dn",
-        dest,
-        migrations: [
-          {
-            version: basename(registry.beforeFile!.fileName),
-            file: registry.beforeFile!,
-            newVersions: null,
-          },
-        ],
-      }))
-    : [];
-  const afterChains: Chain[] = registry.afterFile
-    ? hostDests.map((dest) => ({
-        type: "up",
-        dest,
-        migrations: [
-          {
-            version: basename(registry.afterFile!.fileName),
-            file: registry.afterFile!,
-            newVersions: null,
-          },
-        ],
-      }))
-    : [];
+  // Remember that if we crash below (e.g. in after.sql), we'll need to run
+  // before.sql+after.sql on retry even if there are no new migration versions
+  await Dest.saveRerunFingerprint(hostDests, beforeAfterFiles, "reset");
+
   const grid = new Grid(
     chains,
     options.parallelism ?? 10,
-    beforeChains,
-    afterChains,
+    registry.beforeFile
+      ? hostDests.map<Chain>((dest) => ({
+          type: "dn",
+          dest,
+          migrations: [
+            {
+              version: basename(registry.beforeFile!.fileName),
+              file: registry.beforeFile!,
+              newVersions: null,
+            },
+          ],
+        }))
+      : [],
+    registry.afterFile
+      ? hostDests.map<Chain>((dest) => ({
+          type: "up",
+          dest,
+          migrations: [
+            {
+              version: basename(registry.afterFile!.fileName),
+              file: registry.afterFile!,
+              newVersions: null,
+            },
+          ],
+        }))
+      : [],
   );
-
-  const progress = options.ci
-    ? null
-    : logUpdate.create(process.stdout, { showCursor: true });
-
+  const progress =
+    process.stdout.isTTY &&
+    process.stdout.rows &&
+    process.stdout.rows >= MIN_TTY_ROWS
+      ? new ProgressPrinterTTY()
+      : new ProgressPrinterStream();
   const success = await grid.run(
-    throttle(() => {
-      const lines = renderGrid(grid);
-      if (lines.length > 0) {
-        progress?.(
-          lines
-            .slice(0, Math.max((process.stdout.rows || 25) - 3, 3))
-            .join("\n"),
-        );
-      } else {
-        progress?.clear();
-      }
-    }, 100),
+    progress.throttle(() =>
+      progress.print(renderGrid(grid, progress.skipEmptyLines())),
+    ),
   );
-  progress?.clear();
+  progress.clear();
 
-  const errors = renderGrid(grid);
+  const errors = renderGrid(grid, true);
   if (errors.length > 0) {
-    printText("\n" + errors);
-    printError("Failed");
+    printError("\n###\n### FAILED. See complete error list below.\n###\n");
+    printText(errors.join("\n"));
+    printError(`Failed with ${errors.length} error(s).`);
   } else {
     printSuccess("Succeeded.");
   }
 
-  return {
-    success,
-    hasMoreWork:
-      options.action.type === "apply" && success
-        ? (await patch.getChains()).length > 0
-        : false,
-  };
+  if (!success) {
+    return { success: false, hasMoreWork: false };
+  }
+
+  await Dest.saveRerunFingerprint(hostDests, beforeAfterFiles, "up-to-date");
+
+  if (options.action.type === "apply") {
+    if ((await patch.getChains()).length > 0) {
+      return { success: true, hasMoreWork: true };
+    } else {
+      await Dest.saveDigests(hostDests, { digest });
+      return { success: true, hasMoreWork: false };
+    }
+  } else {
+    await Dest.saveDigests(hostDests, { reset: "after-undo" });
+    return { success: true, hasMoreWork: false };
+  }
 }
 
 /**
- * Entry point for the CLI tool.
+ * A wrapper around main() to call it from a bin script.
  */
-if (require.main === module) {
-  main()
+export function cli(): void {
+  main(process.argv.slice(2))
     .then((success) => process.exit(success ? 0 : 1))
     .catch((e) => {
       printError(e);
       process.exit(1);
     });
+}
+
+if (require.main === module) {
+  cli();
 }

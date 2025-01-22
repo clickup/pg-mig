@@ -1,6 +1,7 @@
 import flatten from "lodash/flatten";
 import sortBy from "lodash/sortBy";
 import type { Dest } from "./Dest";
+import { promiseAllMap } from "./helpers/promiseAllMap";
 import type { Entry, File, Registry } from "./Registry";
 
 interface Mode {
@@ -49,8 +50,8 @@ export class Patch {
       }
     }
 
-    const chains = await Promise["all"](
-      this.hosts.map(async (hostDest) => this.getHostChains(hostDest)),
+    const chains = await promiseAllMap(this.hosts, async (hostDest) =>
+      this.getHostChains(hostDest),
     );
     return flatten(chains);
   }

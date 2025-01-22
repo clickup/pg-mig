@@ -15,11 +15,9 @@ export async function makeMigration(
     `${migrationFilenameBase}.dn.sql`,
   ].map((f) => join(migrationDir, f));
 
-  migrationFiles.forEach((f) => {
-    writeFileSync(f, "", {
-      mode: 0o644,
-    });
-  });
+  for (const f of migrationFiles) {
+    writeFileSync(f, "", { mode: 0o644 });
+  }
 
   return migrationFiles;
 }

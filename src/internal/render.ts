@@ -1,60 +1,93 @@
+import { basename } from "path";
 import chalk from "chalk";
+import compact from "lodash/compact";
 import sortBy from "lodash/sortBy";
+import sum from "lodash/sum";
 import type { Dest } from "./Dest";
 import type { Grid } from "./Grid";
 import { collapse } from "./helpers/collapse";
 import { DefaultMap } from "./helpers/DefaultMap";
+import { promiseAllMap } from "./helpers/promiseAllMap";
 import type { Chain } from "./Patch";
 import type { Registry } from "./Registry";
 
 const Table = require("table-layout");
 
-const MIN_WIDTH = 110;
-process.stdout.columns = Math.max(process.stdout.columns || 0, MIN_WIDTH);
-process.stderr.columns = Math.max(process.stderr.columns || 0, MIN_WIDTH);
-const TABLE_OPTIONS = {
-  maxWidth: process.stdout.columns - 2,
-};
+const lengthsByGrid = new WeakMap<
+  Grid,
+  {
+    succeededMigrations: number;
+    errorMigrations: number;
+    destHost: number;
+    destSchema: number;
+    migrationVersion: number;
+    prefix: number;
+  }
+>();
 
-export function renderGrid(grid: Grid): string[] {
+export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
+  let lengths = lengthsByGrid.get(grid);
+  if (!lengths) {
+    const chains = [...grid.chains, ...grid.beforeChains, ...grid.afterChains];
+    const versionLengths = sortBy(
+      chains.flatMap((chain) =>
+        chain.migrations.map((migration) => migration.version.length),
+      ),
+    );
+    lengths = {
+      succeededMigrations: 4,
+      errorMigrations: 3,
+      destHost: Math.max(...chains.map((chain) => chain.dest.host.length)),
+      destSchema: Math.max(...chains.map((chain) => chain.dest.schema.length)),
+      migrationVersion:
+        versionLengths[Math.floor(versionLengths.length * 0.8)] || 1,
+      prefix: 0,
+    };
+    lengths.prefix =
+      sum(Object.values(lengths)) + Object.values(lengths).length;
+    lengthsByGrid.set(grid, lengths);
+  }
+
   const activeRows: string[][] = [];
-  const errorRows: string[][] = [];
+  const errors: string[] = [];
   for (const worker of sortBy(
     grid.workers,
     (worker) => worker.curDest?.host,
     (worker) => worker.curDest?.schema,
   )) {
-    if (worker.curDest) {
+    if (worker.curDest && (!skipEmptyLines || worker.curLine?.trim())) {
       activeRows.push([
-        chalk.green("  " + worker.succeededMigrations),
+        chalk.green(
+          worker.succeededMigrations
+            .toString()
+            .padStart(lengths.succeededMigrations),
+        ),
         worker.errorMigrations.length
-          ? chalk.red(worker.errorMigrations.length + "")
-          : chalk.gray("0"),
-        formatHost(worker.curDest.host),
-        worker.curDest.schema,
-        worker.curMigration!.version,
-        worker.curLine || "",
+          ? chalk.red(
+              worker.errorMigrations.length
+                .toString()
+                .padStart(lengths.errorMigrations),
+            )
+          : chalk.gray("0".padStart(lengths.errorMigrations)),
+        formatHost(worker.curDest.host).padEnd(lengths.destHost),
+        worker.curDest.schema.padEnd(lengths.destSchema),
+        worker
+          .curMigration!.version.substring(0, lengths.migrationVersion)
+          .padEnd(lengths.migrationVersion),
+        worker.curLine?.trimEnd() || "",
       ]);
     }
 
     for (const { dest, migration, error } of worker.errorMigrations) {
-      errorRows.push([
-        chalk.red("#"),
-        chalk.red(dest.toString() + " <- " + migration.version),
-      ]);
-      errorRows.push(["", ("" + error).trimEnd()]);
-      errorRows.push(["", ""]);
+      errors.push(
+        chalk.red("#") +
+          " " +
+          chalk.red(dest.toString() + " <- " + migration.version) +
+          "\n" +
+          ("" + error).trimEnd(),
+      );
     }
   }
-
-  const table1 = new Table(activeRows, {
-    ...TABLE_OPTIONS,
-    padding: { right: "  ", left: "" },
-  });
-  const table2 = new Table(errorRows, {
-    ...TABLE_OPTIONS,
-    padding: { right: " ", left: "" },
-  });
 
   const { processedMigrations, totalMigrations, elapsedSeconds } = grid;
   const leftMigrations = Math.max(totalMigrations - processedMigrations, 0);
@@ -73,9 +106,15 @@ export function renderGrid(grid: Grid): string[] {
         " migrations/s"
       : "";
 
-  const text =
-    (activeRows.length > 0
-      ? "Running: " +
+  const tableOptions = {
+    maxWidth: process.stdout.columns
+      ? Math.max(process.stdout.columns - 2, lengths.prefix + 30)
+      : 1000000,
+    padding: { right: "  ", left: "" },
+  };
+  return compact([
+    activeRows.length > 0 &&
+      "Migrating: " +
         [
           percentDone + "%",
           Math.round(elapsedSeconds) + "s elapsed",
@@ -83,15 +122,20 @@ export function renderGrid(grid: Grid): string[] {
           qps,
         ]
           .filter((v) => v.length > 0)
-          .join(", ") +
-        "\n" +
-        table1.toString() +
-        "\n"
-      : "") + (errorRows.length > 0 ? table2.toString().trimEnd() + "\n" : "");
-  return text.split("\n").filter(Boolean);
+          .join(", "),
+    // Render each row as an independent table, in sake of just wrapping the
+    // long worker.curLine strings.
+    ...activeRows.map((row) =>
+      new Table([row], tableOptions).toString().trimRight(),
+    ),
+    ...errors,
+  ]);
 }
 
-export function renderPatchSummary(chains: Chain[]): string {
+export function renderPatchSummary(
+  chains: Chain[],
+  beforeAfterFiles: string[],
+): string {
   const destsGrouped = new DefaultMap<string, string[]>();
   for (const chain of chains) {
     const key =
@@ -108,8 +152,13 @@ export function renderPatchSummary(chains: Chain[]): string {
   }
 
   return chalk.yellow(
-    "Migrations to apply:\n" +
-      (rows.length ? rows : ["<no changes>"]).map((s) => "  * " + s).join("\n"),
+    "Migration versions to apply:\n" +
+      compact([
+        ...(rows.length ? rows : ["<no new migration versions>"]),
+        beforeAfterFiles.map((fileName) => basename(fileName)).join(", "),
+      ])
+        .map((s) => "  * " + s)
+        .join("\n"),
   );
 }
 
@@ -118,19 +167,17 @@ export async function renderLatestVersions(
   registry: Registry,
 ): Promise<string> {
   const destsGrouped = new DefaultMap<string, string[]>();
-  await Promise["all"](
-    dests.map(async (dest) => {
-      const allSchemas = await dest.loadSchemas();
-      const reEntries = registry.groupBySchema(allSchemas);
-      const schemas = Array.from(reEntries.keys());
-      const versionsBySchema = await dest.loadVersionsBySchema(schemas);
-      for (const [schema, versions] of versionsBySchema) {
-        destsGrouped
-          .getOrAdd(versions[versions.length - 1] || "", [])
-          .push(formatHost(dest.host) + ":" + schema);
-      }
-    }),
-  );
+  await promiseAllMap(dests, async (dest) => {
+    const allSchemas = await dest.loadSchemas();
+    const reEntries = registry.groupBySchema(allSchemas);
+    const schemas = Array.from(reEntries.keys());
+    const versionsBySchema = await dest.loadVersionsBySchema(schemas);
+    for (const [schema, versions] of versionsBySchema) {
+      destsGrouped
+        .getOrAdd(versions[versions.length - 1] || "", [])
+        .push(formatHost(dest.host) + ":" + schema);
+    }
+  });
   const rows = [];
   for (const [key, dests] of sortBy(
     Array.from(destsGrouped),
@@ -151,11 +198,19 @@ export function printText(text: string): void {
 }
 
 export function printSuccess(text: string): void {
-  return printText(chalk.green("" + text));
+  return printText(chalk.green(text));
 }
 
-export function printError(error: unknown): void {
-  return printText(chalk.red("Error: " + error));
+export function printError(e: unknown): void {
+  return printText(
+    chalk.red(
+      e instanceof Error
+        ? (e.stack ?? e.message).trim()
+        : typeof e === "string" && !e.includes("\n")
+          ? `Error: ${e}`
+          : "" + e,
+    ),
+  );
 }
 
 function formatHost(host: string): string {
