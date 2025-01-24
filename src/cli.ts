@@ -52,6 +52,8 @@ export interface MigrateOptions {
   parallelism?: number;
   /** If true, prints what it plans to do, but doesn't change anything. */
   dry?: boolean;
+  /** If true, runs before/after files on apply even if nothing is changed. */
+  force?: boolean;
   /** What to do. */
   action:
     | { type: "make"; name: string }
@@ -98,7 +100,7 @@ export async function main(argsIn: string[]): Promise<boolean> {
       "list",
       "parallelism",
     ],
-    ["dry", "createdb"],
+    ["dry", "createdb", "force"],
   );
 
   const action: MigrateOptions["action"] =
@@ -149,6 +151,7 @@ export async function main(argsIn: string[]): Promise<boolean> {
       ),
     parallelism: parseInt(args.get("parallelism", "0")) || undefined,
     dry: args.flag("dry"),
+    force: args.flag("force"),
     action,
   });
 }
@@ -337,7 +340,8 @@ async function actionUndoOrApply(
 
   if (
     chains.length === 0 &&
-    (await Dest.checkRerunFingerprint(hostDests, beforeAfterFiles))
+    (await Dest.checkRerunFingerprint(hostDests, beforeAfterFiles)) &&
+    !options.force
   ) {
     // If we have nothing to apply, save the digest in case it was not saved
     // previously, to keep the invariant.
@@ -356,9 +360,9 @@ async function actionUndoOrApply(
     printText(renderPatchSummary(chains, beforeAfterFiles));
     printSuccess("Dry-run mode.");
     return { success: true, hasMoreWork: false };
-  } else {
-    printText(renderPatchSummary(chains, beforeAfterFiles));
   }
+
+  printText(renderPatchSummary(chains, beforeAfterFiles));
 
   // Remember that if we crash below (e.g. in after.sql), we'll need to run
   // before.sql+after.sql on retry even if there are no new migration versions

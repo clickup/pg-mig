@@ -268,12 +268,12 @@ UPDATE my_table SET some=:'var1';
 
 ### Use Environment Variables
 
-If you assign e.g. `process.env.HOSTS = "{a,b,c}"` in your `pg-mig.config.ts` file, you can use that value in all of the version files using the standard `psql` feature:
+If you assign e.g. `process.env.VAR = "a,b,c"` (or return it) in your `pg-mig.config.ts` file, you can use that value in all of the version files using the standard `psql` feature:
 
 ```sql
 -- mig/20231017204837.initial.public.up.sql
-\set HOSTS `echo "$HOSTS"`
-SELECT my_function(:'HOSTS');
+\set HOSTS `echo "$VAR"`
+SELECT my_function(:'VAR');
 ```
 
 ### More Meta-Commands
@@ -323,37 +323,41 @@ Here is the complete list of `-- $` pseudo comments that pg-mig supports in the 
 * `$parallelism_per_host=N`: as mentioned above, this option forces the parallel migrations for schemas on the same host to wait for each other, not allowing to run more than N of then at the same time.
 * `$parallelism_global=N`: limits parallelism of this particular version _within the same schema prefix_ across all hosts.
 * `$delay=M`: introduces a delay (in ms) between each migration. You can use it with `$parallelism_global` to reduce load on the database even further.
-* `$run_alone=1`: if set to 1, no other migrations, _including other schema prefixes_, will run on any other host while this one is running. I.e. it introduces global ordering of the migration files application across schemas. This option is useful when you want to e.g. install a PostgreSQL extension used in other schemas, so you want all other schemas to wait until the installation finishes.
+* `$run_alone=1`: if set to 1, no other migrations, _including other schema prefixes_, will run on any other host while this one is running. I.e. it introduces a global ordering of the migration files application across schemas. This option is useful when you want to e.g. install a PostgreSQL extension used in other schemas, so you want all other schemas to wait until the installation finishes.
 
 ## Advanced: Use With pg-microsharding Library
 
 Overall, there are many popular alternatives to pg-mig when it comes to managing a single database with no sharding. But when it comes to migrating the entire cluster with multiple nodes, or working with microsharding, pg-mig starts shining.
 
-The recommended library to manage the microshards schemas is [pg-microsharding](https://www.npmjs.com/package/@clickup/pg-microsharding). To couple it with pg-mig, create the following files:
-
-```sql
--- mig/YYYYMMDDhhmmss.add_microsharding.public.up.sql
-CREATE SCHEMA microsharding;
-SET search_path TO microsharding;
-\ir ../pg-microsharding/sql/pg-microsharding-up.sql
-```
-
-```sql
--- mig/YYYYMMDDhhmmss.add_microsharding.public.dn.sql
-DROP SCHEMA microsharding;
-```
-
-Also, define before/after scripts:
+The recommended library to manage the microshards schemas is [pg-microsharding](https://www.npmjs.com/package/@clickup/pg-microsharding). To couple it with pg-mig, create the following before/after scripts:
 
 ```sql
 -- mig/before.sql
+CREATE SCHEMA IF NOT EXISTS microsharding;
+SET search_path TO microsharding;
+\ir ../pg-microsharding/sql/pg-microsharding-up.sql
 SELECT microsharding.microsharding_migration_before();
 ```
 
 ```sql
 -- mig/after.sql
 \set HOSTS `echo "$HOSTS"`
-SELECT microsharding.microsharding_migration_after(:'HOSTS');
+SELECT microsharding.microsharding_migration_after(:'PGHOST');
+```
+
+Make sure that you also define `PGHOST` environment variable as a comma-separated list of cluster hosts in your `pg-mig.config.ts` :
+
+```typescript
+export default async function(action: "apply" | "undo" | string) {
+  ...
+  return {
+    PGHOST: islands
+      .map((island) => island.nodes.map(({ host }) => host)
+      .flat()
+      .join(","),
+    ...
+  };
+}
 ```
 
 ### Microsharding Debug Views
@@ -498,7 +502,7 @@ To help with this check, pg-mig exposes the concept called "version digest". It'
 
 Digest is a string, and by comparing 2 digests lexicographically, you may make a decision, which one is "better" (or, if you don't want "better/worse" comparison, you can also compare them for strict equality). If the database's digest is **greater or equal to** the application code's digest, then the code is compatible to the currently existing cluster schema, so the code can be deployed ("your database is ahead of the code").
 
-* Run `pg-mig --list=digest` to print the digest of the current migration files on disk (i.e. "code digest"), like `20250114061047.1552475c743aac017bf0252d540eb033859c6e`.
+* Run `pg-mig --list=digest` to print the digest of the current migration files on disk (i.e. "code digest"), like `20250114061047.1552475c743aac01`.
 * Use `loadDBDigest()` function exported by pg-mig Node library to extract the digest from the current databases used by the app (i.e. "database digest"). E.g. you can call it from your app's `/health` endpoint to allow querying the current database version digest from a deployment script or pipeline.
 
 Every time the whole migration process succeeds, the digest is saved to _all database nodes_, so it can be later retrieved with `loadDBDigest()`. If you have multiple nodes managed by pg-mig, and they happen to appear out of sync, then this function will take care of choosing the most "sane" digest from those nodes, to let you compare it with the "code digest", with no single point of failure.

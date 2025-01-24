@@ -23,4 +23,5 @@ Options for the migrate() function.
 | <a id="createdb"></a> `createDB?` | `boolean` | If true, tries to create the given database. This is helpful when running the tool on a developer's machine. |
 | <a id="parallelism"></a> `parallelism?` | `number` | How many schemas to process in parallel (defaults to 10). |
 | <a id="dry"></a> `dry?` | `boolean` | If true, prints what it plans to do, but doesn't change anything. |
+| <a id="force"></a> `force?` | `boolean` | If true, runs before/after files on apply even if nothing is changed. |
 | <a id="action"></a> `action` | \{ `type`: `"make"`; `name`: `string`; \} \| \{ `type`: `"list"`; \} \| \{ `type`: `"digest"`; \} \| \{ `type`: `"undo"`; `version`: `string`; \} \| \{ `type`: `"apply"`; `after`: () => `void` \| `Promise`\<`void`\>[]; \} | What to do. |

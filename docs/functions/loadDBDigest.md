@@ -8,7 +8,7 @@
 
 > **loadDBDigest**\<`TDest`\>(`dests`, `sqlRunner`): `Promise`\<`string`\>
 
-Defined in: [src/cli.ts:201](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L201)
+Defined in: [src/cli.ts:204](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L204)
 
 Loads the digest strings from the provided databases and chooses the one
 which reflects the database schema status the best.
