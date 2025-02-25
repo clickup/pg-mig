@@ -21,11 +21,22 @@ export async function readConfigs(
 
     const pathJS = `${path}.js`;
     if (existsSync(pathJS)) {
-      loaded = require(pathJS);
+      try {
+        // First, try CommonJS require().
+        loaded = require(pathJS);
+      } catch (e: unknown) {
+        if (`${e}`.includes("ERR_REQUIRE_ESM")) {
+          // If it's a ESM project (e.g. "type": "module" in package.json), then
+          // try ESM native import.
+          loaded = await import(pathJS);
+        } else {
+          throw e;
+        }
+      }
     }
 
     const pathTS = `${path}.ts`;
-    if (existsSync(pathTS)) {
+    if (!loaded && existsSync(pathTS)) {
       try {
         // eslint-disable-next-line import/no-extraneous-dependencies
         require("ts-node/register");

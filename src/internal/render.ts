@@ -25,7 +25,14 @@ const lengthsByGrid = new WeakMap<
   }
 >();
 
-export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
+export function renderGrid(
+  grid: Grid,
+  skipEmptyLines: boolean,
+): {
+  lines: string[];
+  errors: string[];
+  warnings: string[];
+} {
   let lengths = lengthsByGrid.get(grid);
   if (!lengths) {
     const chains = [...grid.chains, ...grid.beforeChains, ...grid.afterChains];
@@ -50,6 +57,7 @@ export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
 
   const activeRows: string[][] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
   for (const worker of sortBy(
     grid.workers,
     (worker) => worker.curDest?.host,
@@ -78,13 +86,23 @@ export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
       ]);
     }
 
-    for (const { dest, migration, error } of worker.errorMigrations) {
+    for (const { dest, migration, payload } of worker.errorMigrations) {
       errors.push(
         chalk.red("#") +
           " " +
           chalk.red(dest.toString() + " <- " + migration.version) +
           "\n" +
-          ("" + error).trimEnd(),
+          ("" + payload).replace(/^/g, "  ").trimEnd(),
+      );
+    }
+
+    for (const { dest, migration, payload } of worker.warningMigrations) {
+      warnings.push(
+        chalk.yellow("#") +
+          " " +
+          chalk.yellow(dest.toString() + " <- " + migration.version) +
+          "\n" +
+          ("" + payload).replace(/^/g, "  ").trimEnd(),
       );
     }
   }
@@ -112,7 +130,7 @@ export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
       : 1000000,
     padding: { right: "  ", left: "" },
   };
-  return compact([
+  const lines = compact([
     activeRows.length > 0 &&
       "Migrating: " +
         [
@@ -129,7 +147,9 @@ export function renderGrid(grid: Grid, skipEmptyLines: boolean): string[] {
       new Table([row], tableOptions).toString().trimRight(),
     ),
     ...errors,
+    ...warnings,
   ]);
+  return { lines, errors, warnings };
 }
 
 export function renderPatchSummary(

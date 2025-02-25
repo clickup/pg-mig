@@ -3,15 +3,16 @@ import type { Dest } from "./Dest";
 import { promiseAllMap } from "./helpers/promiseAllMap";
 import type { Chain, Migration } from "./Patch";
 
-export interface MigrationError {
+export interface MigrationOutput {
   dest: Dest;
   migration: Migration;
-  error: any;
+  payload: unknown;
 }
 
 export class Worker {
   private _succeededMigrations: number = 0;
-  private _errorMigrations: MigrationError[] = [];
+  private _errorMigrations: MigrationOutput[] = [];
+  private _warningMigrations: MigrationOutput[] = [];
   private _curDest: Dest | null = null;
   private _curMigration: Migration | null = null;
   private _curLine: string | null = null;
@@ -25,8 +26,12 @@ export class Worker {
     return this._succeededMigrations;
   }
 
-  get errorMigrations(): readonly MigrationError[] {
+  get errorMigrations(): readonly MigrationOutput[] {
     return this._errorMigrations;
+  }
+
+  get warningMigrations(): readonly MigrationOutput[] {
+    return this._warningMigrations;
   }
 
   get curDest(): Readonly<Dest> | null {
@@ -51,13 +56,23 @@ export class Worker {
         onChange();
         const interval = setInterval(() => onChange(), 200); // for long-running migrations
         try {
-          await this.processMigration(chain.dest, migration);
+          const { warning } = await this.processMigration(
+            chain.dest,
+            migration,
+          );
           this._succeededMigrations++;
+          if (warning) {
+            this._warningMigrations.push({
+              dest: chain.dest,
+              migration,
+              payload: warning,
+            });
+          }
         } catch (error: unknown) {
           this._errorMigrations.push({
             dest: chain.dest,
             migration,
-            error,
+            payload: error,
           });
           break;
         } finally {
@@ -76,7 +91,7 @@ export class Worker {
   private async processMigration(
     dest: Dest,
     migration: Migration,
-  ): Promise<void> {
+  ): Promise<{ warning: string | null }> {
     this._curLine = "waiting to satisfy parallelism limits...";
     const releases = await promiseAllMap(
       [
@@ -113,6 +128,8 @@ export class Worker {
           setTimeout(resolve, migration.file.delay),
         );
       }
+
+      return { warning: res.warning };
     } finally {
       releases.forEach((release) => release());
     }

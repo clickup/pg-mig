@@ -406,16 +406,22 @@ async function actionUndoOrApply(
       : new ProgressPrinterStream();
   const success = await grid.run(
     progress.throttle(() =>
-      progress.print(renderGrid(grid, progress.skipEmptyLines())),
+      progress.print(renderGrid(grid, progress.skipEmptyLines()).lines),
     ),
   );
   progress.clear();
 
-  const errors = renderGrid(grid, true);
+  const { lines, errors, warnings } = renderGrid(grid, true);
   if (errors.length > 0) {
     printError("\n###\n### FAILED. See complete error list below.\n###\n");
-    printText(errors.join("\n"));
+    printText(lines.join("\n"));
     printError(`Failed with ${errors.length} error(s).`);
+  } else if (warnings.length > 0) {
+    printText(
+      "\n###\n### SUCCEEDED with warnings. See complete warning list below.\n###\n",
+    );
+    printText(lines.join("\n"));
+    printSuccess(`Succeeded with ${warnings.length} warning(s).`);
   } else {
     printSuccess("Succeeded.");
   }

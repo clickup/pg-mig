@@ -15,7 +15,7 @@ export class ProgressPrinterTTY implements ProgressPrinter {
   });
 
   throttle(render: () => void): () => void {
-    return throttle(render, 100);
+    return throttle(render, 100, { trailing: false });
   }
 
   print(rows: string[]): void {

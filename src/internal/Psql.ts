@@ -49,6 +49,12 @@ export class Psql {
     return this._stderr;
   }
 
+  get warning(): string | null {
+    return this._stderr.match(/\bWARNING: {2}/m)
+      ? this._stderr.trimEnd()
+      : null;
+  }
+
   get out(): string {
     return this._out;
   }
