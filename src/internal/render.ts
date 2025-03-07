@@ -92,7 +92,7 @@ export function renderGrid(
           " " +
           chalk.red(dest.toString() + " <- " + migration.version) +
           "\n" +
-          ("" + payload).replace(/^/g, "  ").trimEnd(),
+          ("" + payload).replace(/^/gm, "  ").trimEnd(),
       );
     }
 
@@ -102,7 +102,7 @@ export function renderGrid(
           " " +
           chalk.yellow(dest.toString() + " <- " + migration.version) +
           "\n" +
-          ("" + payload).replace(/^/g, "  ").trimEnd(),
+          ("" + payload).replace(/^/gm, "  ").trimEnd(),
       );
     }
   }

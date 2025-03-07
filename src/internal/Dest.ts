@@ -4,6 +4,7 @@ import { inspect } from "util";
 import chunk from "lodash/chunk";
 import compact from "lodash/compact";
 import first from "lodash/first";
+import { dedent } from "./helpers/dedent";
 import { filesHash } from "./helpers/filesHash";
 import { promiseAllMap } from "./helpers/promiseAllMap";
 import { MIGRATION_VERSION_APPLIED, Psql } from "./Psql";
@@ -35,7 +36,9 @@ const FUNC_DIGEST = "mig_digest_const";
 const FUNC_RERUN_FINGERPRINT = "mig_rerun_fingerprint_const";
 
 /**
- * The default schema which is active when connecting to a DB.
+ * The default public schema which is active when connecting to a DB. Some
+ * constant functions above are created in this schema, so the role that runs
+ * the migration must have CREATE privilege on it.
  */
 const DEFAULT_SCHEMA = "public";
 
@@ -160,7 +163,7 @@ export class Dest {
       this.user,
       this.pass,
       "template1",
-      "public",
+      undefined,
     );
   }
 
@@ -314,7 +317,7 @@ export class Dest {
    */
   private async saveDigest(digest: string): Promise<void> {
     await this.query(`
-      CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_DIGEST}() RETURNS text
+      CREATE OR REPLACE FUNCTION ${DEFAULT_SCHEMA}.${FUNC_DIGEST}() RETURNS text
       LANGUAGE sql SET search_path FROM CURRENT AS
       $$ SELECT ${this.escape(digest)}; $$;
     `);
@@ -328,7 +331,7 @@ export class Dest {
    */
   private async saveRerunFingerprint(fingerprint: string): Promise<void> {
     await this.query(`
-      CREATE OR REPLACE FUNCTION ${this.schema}.${FUNC_RERUN_FINGERPRINT}() RETURNS text
+      CREATE OR REPLACE FUNCTION ${DEFAULT_SCHEMA}.${FUNC_RERUN_FINGERPRINT}() RETURNS text
       LANGUAGE sql SET search_path FROM CURRENT AS
       $$ SELECT ${this.escape(fingerprint)}; $$;
     `);
@@ -340,7 +343,7 @@ export class Dest {
   private async loadRerunFingerprint(): Promise<string> {
     try {
       const res = await this.query(
-        `SELECT ${this.schema}.${FUNC_RERUN_FINGERPRINT}()`,
+        `SELECT ${DEFAULT_SCHEMA}.${FUNC_RERUN_FINGERPRINT}()`,
       );
       return first(res[0]) ?? "";
     } catch (e: unknown) {
@@ -394,7 +397,11 @@ export class Dest {
     );
     const { code, stdout, out } = await psql.run();
     if (code) {
-      throw "psql failed (" + this.toString() + ")\n" + out;
+      throw (
+        `psql failed (${this.toString()})\n` +
+        `${out.trimEnd()}\n` +
+        `SQL: ${dedent(sql).trimEnd()}`
+      );
     }
 
     return stdout

@@ -20,7 +20,7 @@ export class Args<TStringArgs extends string, TFlagArgs extends string> {
   get(name: TStringArgs, def?: string): string {
     const v = this.args[name] !== undefined ? this.args[name] : def;
     if (v === undefined) {
-      throw `Parameter ${name} is missing`;
+      throw `Parameter --${name} is missing`;
     }
 
     return v;

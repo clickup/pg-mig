@@ -100,7 +100,7 @@ export async function main(argsIn: string[]): Promise<boolean> {
       "list",
       "parallelism",
     ],
-    ["dry", "createdb", "force"],
+    ["dry", "createdb", "force", "skip-config"],
   );
 
   const action: MigrateOptions["action"] =
@@ -114,23 +114,25 @@ export async function main(argsIn: string[]): Promise<boolean> {
             ? { type: "undo", version: args.get("undo") }
             : { type: "apply", after: [] };
 
-  for (const config of await readConfigs("pg-mig.config", action.type)) {
-    Object.assign(
-      process.env,
-      mapValues(
-        pickBy(
-          config,
-          (v) =>
-            typeof v === "string" ||
-            typeof v === "number" ||
-            typeof v === "boolean",
+  if (!args.flag("skip-config")) {
+    for (const config of await readConfigs("pg-mig.config", action.type)) {
+      Object.assign(
+        process.env,
+        mapValues(
+          pickBy(
+            config,
+            (v) =>
+              typeof v === "string" ||
+              typeof v === "number" ||
+              typeof v === "boolean",
+          ),
+          String,
         ),
-        String,
-      ),
-    );
-    if (action.type === "apply") {
-      if ("after" in config && typeof config.after === "function") {
-        action.after!.push(config.after as () => void | Promise<void>);
+      );
+      if (action.type === "apply") {
+        if ("after" in config && typeof config.after === "function") {
+          action.after!.push(config.after as () => void | Promise<void>);
+        }
       }
     }
   }

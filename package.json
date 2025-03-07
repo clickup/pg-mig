@@ -1,7 +1,7 @@
 {
   "name": "@clickup/pg-mig",
-  "description": "PostgreSQL schema migration tool with micro-sharding and clustering support",
-  "version": "2.12.5",
+  "description": "PostgreSQL schema migration tool with microsharding and clustering support",
+  "version": "2.12.6",
   "license": "MIT",
   "keywords": [
     "postgresql",
@@ -10,6 +10,7 @@
     "schema",
     "migration",
     "micro-sharding",
+    "microsharding",
     "clustering",
     "DDL",
     "psql",
@@ -46,7 +47,7 @@
     "@types/lodash": "^4.14.175",
     "@types/minimist": "^1.2.2",
     "@types/node": "^20.4.1",
-    "@types/pg": "^8.6.1",
+    "@types/pg": "^8.11.11",
     "@types/prompts": "^2.4.0",
     "@types/shell-quote": "^1.7.1",
     "@types/sprintf-js": "^1.1.2",

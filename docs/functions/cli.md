@@ -8,7 +8,7 @@
 
 > **cli**(): `void`
 
-Defined in: [src/cli.ts:451](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L451)
+Defined in: [src/cli.ts:453](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L453)
 
 A wrapper around main() to call it from a bin script.
 
