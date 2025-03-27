@@ -6,6 +6,7 @@ import compact from "lodash/compact";
 import first from "lodash/first";
 import { dedent } from "./helpers/dedent";
 import { filesHash } from "./helpers/filesHash";
+import { normalizeDsn } from "./helpers/normalizeDsn";
 import { promiseAllMap } from "./helpers/promiseAllMap";
 import { MIGRATION_VERSION_APPLIED, Psql } from "./Psql";
 
@@ -46,7 +47,10 @@ const DEFAULT_SCHEMA = "public";
  * A destination database+schema to run the migrations against.
  */
 export class Dest {
-  constructor(
+  private portIsSignificant = false;
+  private dbIsSignificant = false;
+
+  protected constructor(
     public readonly host: string,
     public readonly port: number,
     public readonly user: string,
@@ -54,6 +58,42 @@ export class Dest {
     public readonly db: string,
     public readonly schema = DEFAULT_SCHEMA,
   ) {}
+
+  /**
+   * Creates a Dest from a host name, host spec (host:port/db) or DSN URL.
+   */
+  static create(
+    hostSpecOrDsn: string,
+    defaults: {
+      host?: string;
+      port?: number;
+      user?: string;
+      pass?: string;
+      db?: string;
+      schema?: string;
+    },
+  ): Dest {
+    const dsn = normalizeDsn(hostSpecOrDsn, {
+      PGUSER: defaults.user,
+      PGPASSWORD: defaults.pass,
+      PGHOST: defaults.host,
+      PGPORT: defaults.port?.toString(),
+      PGDATABASE: defaults.db,
+      PGSSLMODE: process.env["PGSSLMODE"],
+    });
+    if (!dsn) {
+      throw "Host name or DSN is required.";
+    }
+
+    const url = new URL(dsn);
+    return new Dest(
+      url.hostname,
+      parseInt(url.port) || 5432,
+      url.username,
+      url.password,
+      url.pathname.slice(1),
+    );
+  }
 
   /**
    * Loads the digests from multiple databases using a custom SQL query runner.
@@ -139,6 +179,22 @@ export class Dest {
   }
 
   /**
+   * When rendering the Dest name, we may sometimes omit the port or the db if
+   * they are all the same across all of the Dests.
+   */
+  setSignificance({
+    portIsSignificant,
+    dbIsSignificant,
+  }: {
+    portIsSignificant: boolean;
+    dbIsSignificant: boolean;
+  }): this {
+    this.portIsSignificant = portIsSignificant;
+    this.dbIsSignificant = dbIsSignificant;
+    return this;
+  }
+
+  /**
    * Returns a Dest switched to a different schema.
    */
   createSchemaDest(schema: string): Dest {
@@ -149,7 +205,10 @@ export class Dest {
       this.pass,
       this.db,
       schema,
-    );
+    ).setSignificance({
+      portIsSignificant: this.portIsSignificant,
+      dbIsSignificant: this.dbIsSignificant,
+    });
   }
 
   /**
@@ -164,14 +223,30 @@ export class Dest {
       this.pass,
       "template1",
       undefined,
+    ).setSignificance({
+      portIsSignificant: this.portIsSignificant,
+      dbIsSignificant: this.dbIsSignificant,
+    });
+  }
+
+  /**
+   * Returns a short human-readable representation of the Dest.
+   */
+  name(short?: "short"): string {
+    return (
+      (!short || this.host.match(/^\d+\.\d+\.\d+\.\d+$/)
+        ? this.host
+        : this.host.replace(/\..*/, "")) +
+      (this.portIsSignificant ? `:${this.port}` : "") +
+      (this.dbIsSignificant ? `/${this.db}` : "")
     );
   }
 
   /**
-   * Returns a human-readable representation of the dest.
+   * Returns a human-readable representation of the Dest with schema.
    */
   toString(): string {
-    return this.host + ":" + this.schema;
+    return this.name() + ":" + this.schema;
   }
 
   /**

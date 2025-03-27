@@ -18,7 +18,7 @@ const lengthsByGrid = new WeakMap<
   {
     succeededMigrations: number;
     errorMigrations: number;
-    destHost: number;
+    destName: number;
     destSchema: number;
     migrationVersion: number;
     prefix: number;
@@ -44,7 +44,9 @@ export function renderGrid(
     lengths = {
       succeededMigrations: 4,
       errorMigrations: 3,
-      destHost: Math.max(...chains.map((chain) => chain.dest.host.length)),
+      destName: Math.max(
+        ...chains.map((chain) => chain.dest.name("short").length),
+      ),
       destSchema: Math.max(...chains.map((chain) => chain.dest.schema.length)),
       migrationVersion:
         versionLengths[Math.floor(versionLengths.length * 0.8)] || 1,
@@ -60,7 +62,7 @@ export function renderGrid(
   const warnings: string[] = [];
   for (const worker of sortBy(
     grid.workers,
-    (worker) => worker.curDest?.host,
+    (worker) => worker.curDest?.name(),
     (worker) => worker.curDest?.schema,
   )) {
     if (worker.curDest && (!skipEmptyLines || worker.curLine?.trim())) {
@@ -77,7 +79,7 @@ export function renderGrid(
                 .padStart(lengths.errorMigrations),
             )
           : chalk.gray("0".padStart(lengths.errorMigrations)),
-        formatHost(worker.curDest.host).padEnd(lengths.destHost),
+        worker.curDest.name("short").padEnd(lengths.destName),
         worker.curDest.schema.padEnd(lengths.destSchema),
         worker
           .curMigration!.version.substring(0, lengths.migrationVersion)
@@ -163,7 +165,7 @@ export function renderPatchSummary(
       chain.migrations.map((ver) => ver.version).join(", ");
     destsGrouped
       .getOrAdd(key, [])
-      .push(formatHost(chain.dest.host) + ":" + chain.dest.schema);
+      .push(chain.dest.name("short") + ":" + chain.dest.schema);
   }
 
   const rows = [];
@@ -195,7 +197,7 @@ export async function renderLatestVersions(
     for (const [schema, versions] of versionsBySchema) {
       destsGrouped
         .getOrAdd(versions[versions.length - 1] || "", [])
-        .push(formatHost(dest.host) + ":" + schema);
+        .push(dest.name("short") + ":" + schema);
     }
   });
   const rows = [];
@@ -231,8 +233,4 @@ export function printError(e: unknown): void {
           : "" + e,
     ),
   );
-}
-
-function formatHost(host: string): string {
-  return host.match(/^\d+\.\d+\.\d+\.\d+$/) ? host : host.replace(/\..*/, "");
 }

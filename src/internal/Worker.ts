@@ -1,3 +1,4 @@
+import { RWLock } from "async-rwlock";
 import { Semaphore } from "await-semaphore";
 import type { Dest } from "./Dest";
 import { promiseAllMap } from "./helpers/promiseAllMap";
@@ -8,6 +9,8 @@ export interface MigrationOutput {
   migration: Migration;
   payload: unknown;
 }
+
+const rwLock = new RWLock();
 
 export class Worker {
   private _succeededMigrations: number = 0;
@@ -93,23 +96,24 @@ export class Worker {
     migration: Migration,
   ): Promise<{ warning: string | null }> {
     this._curLine = "waiting to satisfy parallelism limits...";
+
     const releases = await promiseAllMap(
       [
-        this.acquireSemaphore(
-          migration.file.runAlone ? 1 : Number.POSITIVE_INFINITY,
-          "alone",
-        ),
+        migration.file.runAlone
+          ? rwLock.writeLock().then(() => rwLock.unlock.bind(rwLock))
+          : rwLock.readLock().then(() => rwLock.unlock.bind(rwLock)),
         this.acquireSemaphore(
           migration.file.parallelismGlobal,
           migration.version,
         ),
         this.acquireSemaphore(
           migration.file.parallelismPerHost,
-          dest.host + ":" + migration.version,
+          dest.host + ":" + migration.version, // intentionally per host here, not per name()
         ),
       ],
       async (p) => p,
     );
+
     try {
       this._curLine = null;
       const res = await dest.runFile(

@@ -8,7 +8,6 @@ import { Dest } from "./internal/Dest";
 import { Grid } from "./internal/Grid";
 import { Args } from "./internal/helpers/Args";
 import { makeMigration } from "./internal/helpers/makeMigration";
-import { promiseAllMap } from "./internal/helpers/promiseAllMap";
 import { readConfigs } from "./internal/helpers/readConfigs";
 import type { Chain } from "./internal/Patch";
 import { Patch } from "./internal/Patch";
@@ -34,17 +33,19 @@ const MIN_TTY_ROWS = 5;
 export interface MigrateOptions {
   /** The directory the migration versions are loaded from. */
   migDir: string;
-  /** List of PostgreSQL master hostnames. The migration versions in `migDir`
-   * will be applied to all of them. */
+  /** List of PostgreSQL master hostnames or DSNs in the format:
+   * "host[:port][/database]" or
+   * "postgres://[user][:password][@]host[:port][/database]". The migration
+   * versions in `migDir` will be applied to all of them. */
   hosts: string[];
   /** PostgreSQL port on each hosts. */
-  port: number;
+  port?: number;
   /** PostgreSQL user on each host. */
-  user: string;
+  user?: string;
   /** PostgreSQL password on each host. */
-  pass: string;
+  pass?: string;
   /** PostgreSQL database name on each host. */
-  db: string;
+  db?: string;
   /** If true, tries to create the given database. This is helpful when running
    * the tool on a developer's machine. */
   createDB?: boolean;
@@ -139,13 +140,16 @@ export async function main(argsIn: string[]): Promise<boolean> {
 
   return migrate({
     migDir: args.get("migdir", process.env["PGMIGDIR"]),
-    hosts: args
-      .get("hosts", process.env["PGHOST"] || "127.0.0.1")
-      .split(/[\s,;]+/),
-    port: parseInt(args.get("port", process.env["PGPORT"] || "5432")),
-    user: args.get("user", process.env["PGUSER"] || ""),
-    pass: args.get("pass", process.env["PGPASSWORD"] || ""),
-    db: args.get("db", process.env["PGDATABASE"]),
+    hosts: compact(
+      args
+        .get("hosts", process.env["PGHOST"] || "127.0.0.1")
+        .split(/[\s,;]+/)
+        .map((host) => host.trim()),
+    ),
+    port: parseInt(args.get("port", process.env["PGPORT"] || "")) || undefined,
+    user: args.get("user", process.env["PGUSER"] || "") || undefined,
+    pass: args.get("pass", process.env["PGPASSWORD"] || "") || undefined,
+    db: args.get("db", process.env["PGDATABASE"] || "") || undefined,
     createDB:
       args.flag("createdb") ||
       ![undefined, null, "", "0", "false", "undefined", "null", "no"].includes(
@@ -169,7 +173,27 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
     return actionDigest(options, registry);
   }
 
-  printText(`Running on ${options.hosts}:${options.port} ${options.db}`);
+  if (options.hosts.length === 0) {
+    throw "No hosts provided.";
+  }
+
+  const hostDests = options.hosts.map((host) => Dest.create(host, options));
+
+  const portIsSignificant = hostDests.some(
+    (dest) => dest.port !== hostDests[0].port,
+  );
+  const dbIsSignificant = hostDests.some((dest) => dest.db !== hostDests[0].db);
+  for (const dest of hostDests) {
+    dest.setSignificance({ portIsSignificant, dbIsSignificant });
+  }
+
+  printText(
+    compact([
+      "Running on " + hostDests.map((dest) => dest.name()).join(","),
+      !portIsSignificant && `port ${hostDests[0].port}`,
+      !dbIsSignificant && `db ${hostDests[0].db}`,
+    ]).join(", "),
+  );
 
   if (options.action.type === "make") {
     return actionMake(options, registry, options.action.name);
@@ -180,7 +204,11 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
   }
 
   while (true) {
-    const { success, hasMoreWork } = await actionUndoOrApply(options, registry);
+    const { success, hasMoreWork } = await actionUndoOrApply(
+      options,
+      hostDests,
+      registry,
+    );
 
     if (
       !options.dry &&
@@ -295,26 +323,23 @@ async function actionDigest(
  */
 async function actionUndoOrApply(
   options: MigrateOptions,
+  hostDests: Dest[],
   registry: Registry,
 ): Promise<{ success: boolean; hasMoreWork: boolean }> {
   const digest = registry.getDigest();
-  const hostDests = options.hosts.map(
-    (host) =>
-      new Dest(host, options.port, options.user, options.pass, options.db),
-  );
 
   if (options.action.type === "apply" && options.createDB) {
-    await promiseAllMap(hostDests, async (dest) =>
-      dest
+    for (const dest of hostDests) {
+      await dest
         .createDB(() =>
-          printText(`PostgreSQL host ${dest.host} is not yet up; waiting...`),
+          printText(`PostgreSQL host ${dest.name()} is not yet up; waiting...`),
         )
         .then(
           (status) =>
             status === "created" &&
-            printText(`Database ${dest.db} did not exist; created.`),
-        ),
-    );
+            printText(`Database ${dest.name()} did not exist; created.`),
+        );
+    }
   }
 
   if (options.action.type === "undo" && !options.action.version) {

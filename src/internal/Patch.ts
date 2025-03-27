@@ -70,9 +70,7 @@ export class Patch {
     );
     return sortBy(
       chains.filter((chain) => chain && chain.migrations.length > 0) as Chain[],
-      (chain) => chain.dest.host,
-      (chain) => chain.dest.db,
-      (chain) => chain.dest.schema,
+      (chain) => chain.dest.toString(),
     );
   }
 

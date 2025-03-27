@@ -69,8 +69,8 @@ export class Grid {
     // the workers will run in parallel and apply migration chains to various
     // shards until there is no more chains in the queue.
     const semaphores = {};
-    const chainsByHost = groupBy(this.chains, (entry) => entry.dest.host);
-    for (const chainsQueue of Object.values(chainsByHost)) {
+    const chainsByDest = groupBy(this.chains, (entry) => entry.dest.name());
+    for (const chainsQueue of Object.values(chainsByDest)) {
       // For each one host, start as many workers as independent chains we have
       // in chainsQueue, but not more than this.workersPerHost. Each worker will
       // pick up jobs (chains) from the shared chainsQueue then.
