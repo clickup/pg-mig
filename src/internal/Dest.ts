@@ -87,11 +87,11 @@ export class Dest {
 
     const url = new URL(dsn);
     return new Dest(
-      url.hostname,
+      decodeURIComponent(url.hostname),
       parseInt(url.port) || 5432,
-      url.username,
-      url.password,
-      url.pathname.slice(1),
+      decodeURIComponent(url.username),
+      decodeURIComponent(url.password),
+      decodeURIComponent(url.pathname.slice(1)),
     );
   }
 
@@ -272,11 +272,17 @@ export class Dest {
       } catch (e: unknown) {
         if (
           typeof e === "string" &&
+          !e.includes("password authentication failed") &&
           (e.includes("the database system is starting up") ||
             e.includes("could not connect to server") ||
             e.includes("error: connection to server"))
         ) {
-          onRetry(e);
+          onRetry(
+            e
+              .match(/ failed: (.*)$/m)?.[1]
+              ?.replace(/\s+/s, " ")
+              .trim() ?? e,
+          );
           await setTimeout(1000);
           continue;
         } else {

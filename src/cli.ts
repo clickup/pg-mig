@@ -331,8 +331,10 @@ async function actionUndoOrApply(
   if (options.action.type === "apply" && options.createDB) {
     for (const dest of hostDests) {
       await dest
-        .createDB(() =>
-          printText(`PostgreSQL host ${dest.name()} is not yet up; waiting...`),
+        .createDB((e) =>
+          printText(
+            `PostgreSQL host ${dest.name()} is not yet up; waiting (${e})...`,
+          ),
         )
         .then(
           (status) =>

@@ -2,6 +2,14 @@ import throttle from "lodash/throttle";
 import logUpdate from "log-update";
 import { printText } from "./render";
 
+if (!process.stdout.columns && parseInt(process.env["COLUMNS"] ?? "")) {
+  process.stdout.columns = parseInt(process.env["COLUMNS"]!);
+}
+
+if (!process.stdout.rows && parseInt(process.env["ROWS"] ?? "")) {
+  process.stdout.rows = parseInt(process.env["ROWS"]!);
+}
+
 export interface ProgressPrinter {
   throttle(render: () => void): () => void;
   print(text: string[]): void;
