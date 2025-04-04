@@ -243,6 +243,13 @@ export class Dest {
   }
 
   /**
+   * Returns host:port/db spec.
+   */
+  hostSpec(): string {
+    return `${this.host}:${this.port}/${this.db}`;
+  }
+
+  /**
    * Returns a human-readable representation of the Dest with schema.
    */
   toString(): string {

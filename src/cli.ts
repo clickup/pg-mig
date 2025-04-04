@@ -179,6 +179,11 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
 
   const hostDests = options.hosts.map((host) => Dest.create(host, options));
 
+  // Available in *.sql migration version files.
+  process.env["PG_MIG_HOSTS"] = hostDests
+    .map((dest) => dest.hostSpec())
+    .join(",");
+
   const portIsSignificant = hostDests.some(
     (dest) => dest.port !== hostDests[0].port,
   );
