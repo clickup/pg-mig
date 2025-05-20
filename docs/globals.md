@@ -10,6 +10,10 @@
 
 ## Functions
 
+- [actionDigest](functions/actionDigest.md)
+- [actionList](functions/actionList.md)
+- [actionMake](functions/actionMake.md)
+- [actionUndoOrApply](functions/actionUndoOrApply.md)
 - [main](functions/main.md)
 - [migrate](functions/migrate.md)
 - [loadDBDigest](functions/loadDBDigest.md)

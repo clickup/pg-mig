@@ -119,6 +119,7 @@ export class Worker {
       const res = await dest.runFile(
         migration.file.fileName,
         migration.newVersions,
+        migration.file.vars,
         (proc) => {
           this._curLine = proc.lastOutLine;
         },

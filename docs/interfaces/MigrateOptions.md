@@ -6,7 +6,7 @@
 
 # Interface: MigrateOptions
 
-Defined in: [src/cli.ts:33](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L33)
+Defined in: [src/cli.ts:19](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L19)
 
 Options for the migrate() function.
 

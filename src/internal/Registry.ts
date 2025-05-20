@@ -4,6 +4,7 @@ import { basename } from "path";
 import partition from "lodash/partition";
 import sortBy from "lodash/sortBy";
 import { DefaultMap } from "./helpers/DefaultMap";
+import type { Vars } from "./helpers/extractVars";
 import { extractVars } from "./helpers/extractVars";
 import { schemaNameMatchesPrefix } from "./helpers/schemaNameMatchesPrefix";
 import { validateCreateIndexConcurrently } from "./helpers/validateCreateIndexConcurrently";
@@ -20,6 +21,7 @@ export interface File {
   parallelismGlobal: number;
   delay: number;
   runAlone: boolean;
+  vars: Vars;
 }
 
 /**
@@ -184,17 +186,17 @@ function buildFile(fileName: string): File {
   const content = readFileSync(fileName).toString();
   const vars = extractVars(fileName, content);
 
-  const file = {
+  const file: File = {
     fileName,
     parallelismGlobal: vars.$parallelism_global || Number.POSITIVE_INFINITY,
     parallelismPerHost: vars.$parallelism_per_host || Number.POSITIVE_INFINITY,
     delay: vars.$delay || 0,
     runAlone: !!vars.$run_alone,
+    vars,
   };
 
-  const errors: string[] = [];
-  errors.push(...validateCreateIndexConcurrently(content, vars));
-
+  const res = validateCreateIndexConcurrently(content, vars);
+  const errors = res.type === "error" ? res.errors : [];
   if (errors.length > 0) {
     throw (
       `File ${basename(fileName)} must satisfy the following:\n` +

@@ -1,13 +1,15 @@
-import { basename, dirname } from "path";
+import { dirname } from "path";
 import { setTimeout } from "timers/promises";
 import { inspect } from "util";
 import chunk from "lodash/chunk";
 import compact from "lodash/compact";
 import first from "lodash/first";
 import { dedent } from "./helpers/dedent";
+import type { Vars } from "./helpers/extractVars";
 import { filesHash } from "./helpers/filesHash";
 import { normalizeDsn } from "./helpers/normalizeDsn";
 import { promiseAllMap } from "./helpers/promiseAllMap";
+import { wrapCreateIndexConcurrently } from "./helpers/wrapCreateIndexConcurrently";
 import { MIGRATION_VERSION_APPLIED, Psql } from "./Psql";
 
 /**
@@ -306,6 +308,7 @@ export class Dest {
   async runFile(
     fileName: string,
     newVersions: string[] | null,
+    vars: Vars,
     onOut?: (proc: Psql) => void,
   ): Promise<Psql> {
     const psql = new Psql(
@@ -325,7 +328,7 @@ export class Dest {
         `SET search_path TO ${this.schema};`,
         "SET statement_timeout TO 0;",
         // Run the actual migration file.
-        `\\i ${basename(fileName)}`,
+        ...wrapCreateIndexConcurrently(fileName, vars),
         ";",
         `\\echo ${MIGRATION_VERSION_APPLIED}`,
         // Update schema version in the same transaction.
