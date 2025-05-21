@@ -362,9 +362,13 @@ export class Dest {
    * Returns all the shard-like schemas from the DB.
    */
   async loadSchemas(): Promise<string[]> {
-    return this.queryCol(
-      "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE '%\\_%' ORDER BY nspname",
-    );
+    return this.queryCol(`
+      SELECT nspname FROM pg_namespace
+      WHERE nspname NOT LIKE 'pg\\_%'
+        AND nspname NOT LIKE 'information_schema'
+        AND nspname NOT LIKE 'debug\\_%'
+      ORDER BY nspname
+    `);
   }
 
   /**

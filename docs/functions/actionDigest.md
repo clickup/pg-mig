@@ -8,7 +8,7 @@
 
 > **actionDigest**(`_options`, `registry`): `Promise`\<`boolean`\>
 
-Defined in: src/actions/actionDigest.ts:12
+Defined in: [src/actions/actionDigest.ts:12](https://github.com/clickup/pg-mig/blob/master/src/actions/actionDigest.ts#L12)
 
 Prints the "code digest", of all migration version names on disk. Digest is a
 string, and those strings can be compared lexicographically to determine

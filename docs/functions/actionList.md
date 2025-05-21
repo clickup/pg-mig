@@ -8,7 +8,7 @@
 
 > **actionList**(`_options`, `registry`): `Promise`\<`boolean`\>
 
-Defined in: src/actions/actionList.ts:9
+Defined in: [src/actions/actionList.ts:9](https://github.com/clickup/pg-mig/blob/master/src/actions/actionList.ts#L9)
 
 Prints the list of all migration versions in the registry.
 

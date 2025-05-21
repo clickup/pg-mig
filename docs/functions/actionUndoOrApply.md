@@ -8,7 +8,7 @@
 
 > **actionUndoOrApply**(`options`, `hostDests`, `registry`): `Promise`\<\{ `success`: `boolean`; `hasMoreWork`: `boolean`; \}\>
 
-Defined in: src/actions/actionUndoOrApply.ts:27
+Defined in: [src/actions/actionUndoOrApply.ts:27](https://github.com/clickup/pg-mig/blob/master/src/actions/actionUndoOrApply.ts#L27)
 
 Applies or undoes migrations.
 
