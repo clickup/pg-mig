@@ -1,5 +1,7 @@
 import escapeRegExp from "lodash/escapeRegExp";
 import type { Vars } from "./extractVars";
+import { hasOtherSqlStatements } from "./hasOtherSqlStatements";
+import { removeSqlComments } from "./removeSqlComments";
 
 const REQUIRED_VARS = [
   "$parallelism_per_host",
@@ -14,11 +16,7 @@ export function validateCreateIndexConcurrently(
   | { type: "success"; indexNamesQuoted: string[] }
   | { type: "success-index-alone"; indexNamesQuoted: string[] }
   | { type: "error"; errors: string[] } {
-  content = content
-    .replace(/--[^\n]*/gm, "")
-    .replace(/\/\*.*?\*\//gs, "")
-    .replace(/^(\s*;)+/gs, "")
-    .trim();
+  content = removeSqlComments(content);
 
   let hasCreateIndexConcurrently = false;
   const errors: string[] = [];
@@ -34,18 +32,10 @@ export function validateCreateIndexConcurrently(
 
     hasCreateIndexConcurrently = true;
     const indexNameQuoted = match[1];
-    const rest = content.slice(match.index + match[0].length);
-
     indexNamesQuoted.push(indexNameQuoted);
 
-    if (
-      match.index === 0 &&
-      rest.match(
-        // The rest of the SQL after the index name doesn't have ";", which
-        // means that it's the only statement in the SQL.
-        /^([^;]|E'([^'\\]|\\.|'')*'|'([^']|'')*'|"([^"]|"")*")*(\s*;)*$/,
-      )
-    ) {
+    const rest = content.slice(match.index + match[0].length);
+    if (match.index === 0 && !hasOtherSqlStatements(rest)) {
       return REQUIRED_VARS.some((k) => !!vars[k])
         ? { type: "success-index-alone", indexNamesQuoted }
         : {

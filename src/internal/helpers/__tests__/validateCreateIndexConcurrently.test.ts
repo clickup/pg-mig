@@ -1,11 +1,5 @@
 import { validateCreateIndexConcurrently } from "../validateCreateIndexConcurrently";
 
-test("no create index concurrently", () => {
-  expect(
-    validateCreateIndexConcurrently('CREATE INDEX "abc" ON tbl(col);', {}),
-  ).toEqual({ type: "success", indexNamesQuoted: [] });
-});
-
 test("errors: multiple", () => {
   expect(
     validateCreateIndexConcurrently(
@@ -37,6 +31,12 @@ test('errors: only "create index concurrently", but no vars', () => {
       "start with one of the following vars: $parallelism_per_host, $parallelism_global, $run_alone",
     ],
   });
+});
+
+test("success: no create index concurrently", () => {
+  expect(
+    validateCreateIndexConcurrently('CREATE INDEX "abc" ON tbl(col);', {}),
+  ).toEqual({ type: "success", indexNamesQuoted: [] });
 });
 
 test("success: regular index", () => {

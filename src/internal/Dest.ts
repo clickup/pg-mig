@@ -9,7 +9,7 @@ import type { Vars } from "./helpers/extractVars";
 import { filesHash } from "./helpers/filesHash";
 import { normalizeDsn } from "./helpers/normalizeDsn";
 import { promiseAllMap } from "./helpers/promiseAllMap";
-import { wrapCreateIndexConcurrently } from "./helpers/wrapCreateIndexConcurrently";
+import { wrapNonTransactional } from "./helpers/wrapNonTransactional";
 import { MIGRATION_VERSION_APPLIED, Psql } from "./Psql";
 
 /**
@@ -328,7 +328,7 @@ export class Dest {
         `SET search_path TO ${this.schema};`,
         "SET statement_timeout TO 0;",
         // Run the actual migration file.
-        ...wrapCreateIndexConcurrently(fileName, vars),
+        ...wrapNonTransactional(fileName, vars).lines,
         ";",
         `\\echo ${MIGRATION_VERSION_APPLIED}`,
         // Update schema version in the same transaction.

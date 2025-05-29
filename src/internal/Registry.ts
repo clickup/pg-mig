@@ -7,7 +7,7 @@ import { DefaultMap } from "./helpers/DefaultMap";
 import type { Vars } from "./helpers/extractVars";
 import { extractVars } from "./helpers/extractVars";
 import { schemaNameMatchesPrefix } from "./helpers/schemaNameMatchesPrefix";
-import { validateCreateIndexConcurrently } from "./helpers/validateCreateIndexConcurrently";
+import { wrapNonTransactional } from "./helpers/wrapNonTransactional";
 
 // Must be lexicographically less than "0".
 const DIGEST_SEP = ".";
@@ -195,8 +195,7 @@ function buildFile(fileName: string): File {
     vars,
   };
 
-  const res = validateCreateIndexConcurrently(content, vars);
-  const errors = res.type === "error" ? res.errors : [];
+  const { errors } = wrapNonTransactional(fileName, vars);
   if (errors.length > 0) {
     throw (
       `File ${basename(fileName)} must satisfy the following:\n` +
