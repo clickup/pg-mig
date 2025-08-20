@@ -1,4 +1,3 @@
-import sortBy from "lodash/sortBy";
 import type { MigrateOptions } from "../cli";
 import type { Registry } from "../internal/Registry";
 import { printText } from "../internal/render";
@@ -12,7 +11,7 @@ export async function actionList(
 ): Promise<boolean> {
   printText("All versions:");
 
-  for (const version of sortBy(registry.getVersions())) {
+  for (const version of registry.getVersions()) {
     printText(` > ${version}`);
   }
 

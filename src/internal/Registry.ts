@@ -49,6 +49,10 @@ export class Registry {
       .sort()
       .filter((file) => lstatSync(dir + "/" + file).isFile());
     for (const file of files) {
+      if (!file.endsWith(".sql")) {
+        continue;
+      }
+
       if (file === "before.sql") {
         this.beforeFile = buildFile(dir + "/" + file);
         continue;
@@ -115,8 +119,8 @@ export class Registry {
     return "0";
   }
 
-  get prefixes(): string[] {
-    return Array.from(this.entriesByPrefix.keys());
+  getPrefixes(): string[] {
+    return [...this.entriesByPrefix.keys()];
   }
 
   groupBySchema(schemas: string[]): ReadonlyMap<string, Entry[]> {
@@ -151,7 +155,7 @@ export class Registry {
   }
 
   getVersions(): string[] {
-    return [...this.versions];
+    return sortBy([...this.versions]);
   }
 
   hasVersion(version: string): boolean {
@@ -163,17 +167,19 @@ export class Registry {
     return matches ? matches[0] : name;
   }
 
-  getDigest(): string {
-    const versions = sortBy(this.getVersions());
+  getDigest(type?: "short"): string {
+    const versions = this.getVersions();
     const lastOrder = versions[versions.length - 1]?.match(/^(\d+)/)
       ? RegExp.$1
       : versions.length > 0
         ? versions[versions.length - 1]
         : "0";
+    const hash = crypto
+      .createHash("sha256")
+      .update(versions.join("\n"))
+      .digest("hex");
     return (
-      lastOrder +
-      DIGEST_SEP +
-      crypto.createHash("sha256").update(versions.join("\n")).digest("hex")
+      lastOrder + DIGEST_SEP + (type === "short" ? hash.slice(0, 16) : hash)
     );
   }
 }

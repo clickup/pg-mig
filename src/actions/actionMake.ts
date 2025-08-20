@@ -4,8 +4,9 @@ import compact from "lodash/compact";
 import max from "lodash/max";
 import moment from "moment";
 import type { MigrateOptions } from "../cli";
-import type { Registry } from "../internal/Registry";
+import { Registry } from "../internal/Registry";
 import { printError, printText } from "../internal/render";
+import { actionChain } from "./actionChain";
 
 /**
  * Makes new migration files.
@@ -30,11 +31,11 @@ export async function actionMake(
     return false;
   }
 
-  if (!registry.prefixes.includes(schemaPrefix)) {
+  if (!registry.getPrefixes().includes(schemaPrefix)) {
     printText(
       `WARNING: schema prefix "${schemaPrefix}" wasn't found. Valid prefixes:`,
     );
-    for (const prefix of registry.prefixes) {
+    for (const prefix of registry.getPrefixes()) {
       printText(`- ${prefix}`);
     }
   }
@@ -47,6 +48,11 @@ export async function actionMake(
     max(compact(registry.getVersions().map((v) => v.match(/^(\d+)\./)?.[1]))) ??
       null,
   );
+
+  registry = new Registry(registry.dir);
+  await actionChain(options, registry);
+
+  printText("Created files:");
   for (const file of createdFiles) {
     printText(file);
   }

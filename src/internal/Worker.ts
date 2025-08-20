@@ -13,49 +13,49 @@ export interface MigrationOutput {
 const rwLock = new RWLock();
 
 export class Worker {
-  private _succeededMigrations: number = 0;
-  private _errorMigrations: MigrationOutput[] = [];
-  private _warningMigrations: MigrationOutput[] = [];
-  private _curDest: Dest | null = null;
-  private _curMigration: Migration | null = null;
-  private _curLine: string | null = null;
+  private succeededMigrations: number = 0;
+  private errorMigrations: MigrationOutput[] = [];
+  private warningMigrations: MigrationOutput[] = [];
+  private curDest: Dest | null = null;
+  private curMigration: Migration | null = null;
+  private curLine: string | null = null;
 
   constructor(
     private chainsQueue: Chain[],
     private semaphores: Record<string, Semaphore>,
   ) {}
 
-  get succeededMigrations(): number {
-    return this._succeededMigrations;
+  getSucceededMigrations(): number {
+    return this.succeededMigrations;
   }
 
-  get errorMigrations(): readonly MigrationOutput[] {
-    return this._errorMigrations;
+  getErrorMigrations(): readonly MigrationOutput[] {
+    return this.errorMigrations;
   }
 
-  get warningMigrations(): readonly MigrationOutput[] {
-    return this._warningMigrations;
+  getWarningMigrations(): readonly MigrationOutput[] {
+    return this.warningMigrations;
   }
 
-  get curDest(): Readonly<Dest> | null {
-    return this._curDest;
+  getCurDest(): Readonly<Dest> | null {
+    return this.curDest;
   }
 
-  get curMigration(): Readonly<Migration> | null {
-    return this._curMigration;
+  getCurMigration(): Readonly<Migration> | null {
+    return this.curMigration;
   }
 
-  get curLine(): string | null {
-    return this._curLine;
+  getCurLine(): string | null {
+    return this.curLine;
   }
 
   async run(onChange: () => void): Promise<void> {
     while (this.chainsQueue.length > 0) {
       const chain = this.chainsQueue.shift()!;
       for (const migration of chain.migrations) {
-        this._curDest = chain.dest;
-        this._curMigration = migration;
-        this._curLine = null;
+        this.curDest = chain.dest;
+        this.curMigration = migration;
+        this.curLine = null;
         onChange();
         const interval = setInterval(() => onChange(), 200); // for long-running migrations
         try {
@@ -63,16 +63,16 @@ export class Worker {
             chain.dest,
             migration,
           );
-          this._succeededMigrations++;
+          this.succeededMigrations++;
           if (warning) {
-            this._warningMigrations.push({
+            this.warningMigrations.push({
               dest: chain.dest,
               migration,
               payload: warning,
             });
           }
         } catch (error: unknown) {
-          this._errorMigrations.push({
+          this.errorMigrations.push({
             dest: chain.dest,
             migration,
             payload: error,
@@ -85,9 +85,9 @@ export class Worker {
       }
     }
 
-    this._curDest = null;
-    this._curMigration = null;
-    this._curLine = null;
+    this.curDest = null;
+    this.curMigration = null;
+    this.curLine = null;
     onChange();
   }
 
@@ -95,7 +95,7 @@ export class Worker {
     dest: Dest,
     migration: Migration,
   ): Promise<{ warning: string | null }> {
-    this._curLine = "waiting to satisfy parallelism limits...";
+    this.curLine = "waiting to satisfy parallelism limits...";
 
     const releases = await promiseAllMap(
       [
@@ -115,17 +115,17 @@ export class Worker {
     );
 
     try {
-      this._curLine = null;
+      this.curLine = null;
       const res = await dest.runFile(
         migration.file.fileName,
         migration.newVersions,
         migration.file.vars,
         (proc) => {
-          this._curLine = proc.lastOutLine;
+          this.curLine = proc.getLastOutLine();
         },
       );
-      if (res.code) {
-        throw res.out.trimEnd();
+      if (res.getCode()) {
+        throw res.getOut().trimEnd();
       }
 
       if (migration.file.delay > 0) {
@@ -134,7 +134,7 @@ export class Worker {
         );
       }
 
-      return { warning: res.warning };
+      return { warning: res.getWarning() };
     } finally {
       releases.forEach((release) => release());
     }

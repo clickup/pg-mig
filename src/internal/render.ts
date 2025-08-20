@@ -45,7 +45,7 @@ export function renderGrid(
       succeededMigrations: 4,
       errorMigrations: 3,
       destName: Math.max(
-        ...chains.map((chain) => chain.dest.name("short").length),
+        ...chains.map((chain) => chain.dest.getName("short").length),
       ),
       destSchema: Math.max(...chains.map((chain) => chain.dest.schema.length)),
       migrationVersion:
@@ -61,34 +61,40 @@ export function renderGrid(
   const errors: string[] = [];
   const warnings: string[] = [];
   for (const worker of sortBy(
-    grid.workers,
-    (worker) => worker.curDest?.name(),
-    (worker) => worker.curDest?.schema,
+    grid.getWorkers(),
+    (worker) => worker.getCurDest()?.getName(),
+    (worker) => worker.getCurDest()?.schema,
   )) {
-    if (worker.curDest && (!skipEmptyLines || worker.curLine?.trim())) {
+    if (
+      worker.getCurDest() &&
+      (!skipEmptyLines || worker.getCurLine()?.trim())
+    ) {
       activeRows.push([
         chalk.green(
-          worker.succeededMigrations
+          worker
+            .getSucceededMigrations()
             .toString()
             .padStart(lengths.succeededMigrations),
         ),
-        worker.errorMigrations.length
+        worker.getErrorMigrations().length
           ? chalk.red(
-              worker.errorMigrations.length
-                .toString()
+              worker
+                .getErrorMigrations()
+                .length.toString()
                 .padStart(lengths.errorMigrations),
             )
           : chalk.gray("0".padStart(lengths.errorMigrations)),
-        worker.curDest.name("short").padEnd(lengths.destName),
-        worker.curDest.schema.padEnd(lengths.destSchema),
+        worker.getCurDest()!.getName("short").padEnd(lengths.destName),
+        worker.getCurDest()!.schema.padEnd(lengths.destSchema),
         worker
-          .curMigration!.version.substring(0, lengths.migrationVersion)
+          .getCurMigration()!
+          .version.substring(0, lengths.migrationVersion)
           .padEnd(lengths.migrationVersion),
-        worker.curLine?.trimEnd() || "",
+        worker.getCurLine()?.trimEnd() || "",
       ]);
     }
 
-    for (const { dest, migration, payload } of worker.errorMigrations) {
+    for (const { dest, migration, payload } of worker.getErrorMigrations()) {
       errors.push(
         chalk.red("#") +
           " " +
@@ -98,7 +104,7 @@ export function renderGrid(
       );
     }
 
-    for (const { dest, migration, payload } of worker.warningMigrations) {
+    for (const { dest, migration, payload } of worker.getWarningMigrations()) {
       warnings.push(
         chalk.yellow("#") +
           " " +
@@ -109,7 +115,9 @@ export function renderGrid(
     }
   }
 
-  const { processedMigrations, totalMigrations, elapsedSeconds } = grid;
+  const processedMigrations = grid.getProcessedMigrations();
+  const totalMigrations = grid.getTotalMigrations();
+  const elapsedSeconds = grid.getElapsedSeconds();
   const leftMigrations = Math.max(totalMigrations - processedMigrations, 0);
   const percentDone =
     totalMigrations > 0 && processedMigrations <= totalMigrations
@@ -165,7 +173,7 @@ export function renderPatchSummary(
       chain.migrations.map((ver) => ver.version).join(", ");
     destsGrouped
       .getOrAdd(key, [])
-      .push(chain.dest.name("short") + ":" + chain.dest.schema);
+      .push(chain.dest.getName("short") + ":" + chain.dest.schema);
   }
 
   const rows = [];
@@ -197,7 +205,7 @@ export async function renderLatestVersions(
     for (const [schema, versions] of versionsBySchema) {
       destsGrouped
         .getOrAdd(versions[versions.length - 1] || "", [])
-        .push(dest.name("short") + ":" + schema);
+        .push(dest.getName("short") + ":" + schema);
     }
   });
   const rows = [];

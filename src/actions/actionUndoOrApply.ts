@@ -36,13 +36,13 @@ export async function actionUndoOrApply(
       await dest
         .createDB((e) =>
           printText(
-            `PostgreSQL host ${dest.name()} is not yet up; waiting (${e})...`,
+            `PostgreSQL host ${dest.getName()} is not yet up; waiting (${e})...`,
           ),
         )
         .then(
           (status) =>
             status === "created" &&
-            printText(`Database ${dest.name()} did not exist; created.`),
+            printText(`Database ${dest.getName()} did not exist; created.`),
         );
     }
   }

@@ -8,9 +8,9 @@ import { Worker } from "./Worker";
  * A fixed set of Workers running the migration chains.
  */
 export class Grid {
-  private _workers: Worker[] = [];
-  private _totalMigrations: number = 0;
-  private _startTime: number = 0;
+  private workers: Worker[] = [];
+  private totalMigrations: number = 0;
+  private startTime: number = 0;
 
   constructor(
     public readonly chains: Chain[],
@@ -19,31 +19,32 @@ export class Grid {
     public readonly afterChains: Chain[] = [],
   ) {}
 
-  get workers(): readonly Worker[] {
-    return this._workers;
+  getWorkers(): readonly Worker[] {
+    return this.workers;
   }
 
-  get totalMigrations(): number {
-    return this._totalMigrations;
+  getTotalMigrations(): number {
+    return this.totalMigrations;
   }
 
-  get processedMigrations(): number {
+  getProcessedMigrations(): number {
     let num = 0;
     for (const worker of this.workers) {
-      num += worker.succeededMigrations + worker.errorMigrations.length;
+      num +=
+        worker.getSucceededMigrations() + worker.getErrorMigrations().length;
     }
 
     return num;
   }
 
-  get elapsedSeconds(): number {
-    return (Date.now() - this._startTime) / 1000;
+  getElapsedSeconds(): number {
+    return (Date.now() - this.startTime) / 1000;
   }
 
-  get numErrors(): number {
+  getNumErrors(): number {
     let num = 0;
-    for (const worker of this._workers) {
-      if (worker.errorMigrations.length > 0) {
+    for (const worker of this.workers) {
+      if (worker.getErrorMigrations().length > 0) {
         num++;
       }
     }
@@ -52,16 +53,16 @@ export class Grid {
   }
 
   async run(onChange: () => void = () => {}): Promise<boolean> {
-    this._startTime = Date.now();
+    this.startTime = Date.now();
 
     // "Before" sequence. Runs in parallel on all hosts (even on those that
     // don't have any new migration versions). If we fail, don't even start the
     // migrations.
-    this._workers.push(
+    this.workers.push(
       ...this.beforeChains.map((chain) => new Worker([chain], {})),
     );
-    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
-    if (this.numErrors) {
+    await promiseAllMap(this.workers, async (worker) => worker.run(onChange));
+    if (this.getNumErrors()) {
       return false;
     }
 
@@ -69,7 +70,7 @@ export class Grid {
     // the workers will run in parallel and apply migration chains to various
     // shards until there is no more chains in the queue.
     const semaphores = {};
-    const chainsByDest = groupBy(this.chains, (entry) => entry.dest.name());
+    const chainsByDest = groupBy(this.chains, (entry) => entry.dest.getName());
     for (const chainsQueue of Object.values(chainsByDest)) {
       // For each one host, start as many workers as independent chains we have
       // in chainsQueue, but not more than this.workersPerHost. Each worker will
@@ -79,27 +80,27 @@ export class Grid {
         i < Math.min(chainsQueue.length, this.workersPerHost);
         i++
       ) {
-        this._workers.push(new Worker(chainsQueue, semaphores));
+        this.workers.push(new Worker(chainsQueue, semaphores));
       }
 
-      this._totalMigrations += sum(
+      this.totalMigrations += sum(
         chainsQueue.map((entry) => entry.migrations.length),
       );
     }
 
-    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
+    await promiseAllMap(this.workers, async (worker) => worker.run(onChange));
 
     // "After" sequence (we run it even on errors above). Runs on all hosts. We
     // don't clear this._workers here: we want to keep the history of errors.
-    this._workers.push(
+    this.workers.push(
       ...this.afterChains.map((chain) => new Worker([chain], {})),
     );
-    await promiseAllMap(this._workers, async (worker) => worker.run(onChange));
-    if (this.numErrors) {
+    await promiseAllMap(this.workers, async (worker) => worker.run(onChange));
+    if (this.getNumErrors()) {
       return false;
     }
 
     // All done.
-    return this.numErrors === 0;
+    return this.getNumErrors() === 0;
   }
 }

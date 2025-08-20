@@ -6,7 +6,7 @@
 
 # Interface: MigrateOptions
 
-Defined in: [src/cli.ts:19](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L19)
+Defined in: [src/cli.ts:20](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L20)
 
 Options for the migrate() function.
 
@@ -24,4 +24,4 @@ Options for the migrate() function.
 | <a id="parallelism"></a> `parallelism?` | `number` | How many schemas to process in parallel (defaults to 10). |
 | <a id="dry"></a> `dry?` | `boolean` | If true, prints what it plans to do, but doesn't change anything. |
 | <a id="force"></a> `force?` | `boolean` | If true, runs before/after files on apply even if nothing is changed. |
-| <a id="action"></a> `action` | \{ `type`: `"make"`; `name`: `string`; \} \| \{ `type`: `"list"`; \} \| \{ `type`: `"digest"`; \} \| \{ `type`: `"undo"`; `version`: `string`; \} \| \{ `type`: `"apply"`; `after`: () => `void` \| `Promise`\<`void`\>[]; \} | What to do. |
+| <a id="action"></a> `action` | \{ `type`: `"make"`; `name`: `string`; \} \| \{ `type`: `"chain"`; \} \| \{ `type`: `"list"`; \} \| \{ `type`: `"digest"`; \} \| \{ `type`: `"undo"`; `version`: `string`; \} \| \{ `type`: `"apply"`; `after`: () => `void` \| `Promise`\<`void`\>[]; \} | What to do. |

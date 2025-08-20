@@ -8,7 +8,7 @@
 
 > **main**(`argsIn`): `Promise`\<`boolean`\>
 
-Defined in: [src/cli.ts:73](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L73)
+Defined in: [src/cli.ts:75](https://github.com/clickup/pg-mig/blob/master/src/cli.ts#L75)
 
 CLI tool entry point. This function is run when `pg-mig` is called from the
 command line. Accepts parameters from process.argv. See `migrate()` for

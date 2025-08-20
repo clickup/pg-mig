@@ -8,7 +8,7 @@
 
 > **actionMake**(`options`, `registry`, `name`): `Promise`\<`boolean`\>
 
-Defined in: [src/actions/actionMake.ts:13](https://github.com/clickup/pg-mig/blob/master/src/actions/actionMake.ts#L13)
+Defined in: [src/actions/actionMake.ts:14](https://github.com/clickup/pg-mig/blob/master/src/actions/actionMake.ts#L14)
 
 Makes new migration files.
 

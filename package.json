@@ -1,7 +1,7 @@
 {
   "name": "@clickup/pg-mig",
   "description": "PostgreSQL schema migration tool with microsharding and clustering support",
-  "version": "2.17.1",
+  "version": "2.18.1",
   "license": "MIT",
   "keywords": [
     "postgresql",

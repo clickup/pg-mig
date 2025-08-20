@@ -16,12 +16,12 @@ export const MIGRATION_VERSION_APPLIED = "MIGRATION_VERSION_APPLIED";
  * line of the output.
  */
 export class Psql {
-  private _args: string[];
-  private _code: number | null = null;
-  private _stdout: string = "";
-  private _stderr: string = "";
-  private _out: string = ""; // a mix of stdin and stdout
-  private _cmdline: string;
+  private args: string[];
+  private code: number | null = null;
+  private stdout: string = "";
+  private stderr: string = "";
+  private out: string = ""; // a mix of stdin and stdout
+  private cmdline: string;
 
   constructor(
     private dest: Dest,
@@ -29,43 +29,41 @@ export class Psql {
     args: string[],
     private stdin: string,
   ) {
-    this._args = [
+    this.args = [
       "-X", // do not read psqlrc
       "-vON_ERROR_STOP=1", // if it fails, then exit code will be nonzero
       ...args,
     ];
-    this._cmdline = "psql " + quote(this._args);
+    this.cmdline = "psql " + quote(this.args);
   }
 
-  get code(): number | null {
-    return this._code;
+  getCode(): number | null {
+    return this.code;
   }
 
-  get stdout(): string {
-    return this._stdout;
+  getStdout(): string {
+    return this.stdout;
   }
 
-  get stderr(): string {
-    return this._stderr;
+  getStderr(): string {
+    return this.stderr;
   }
 
-  get warning(): string | null {
-    return this._stderr.match(/\bWARNING: {2}/m)
-      ? this._stderr.trimEnd()
-      : null;
+  getWarning(): string | null {
+    return this.stderr.match(/\bWARNING: {2}/m) ? this.stderr.trimEnd() : null;
   }
 
-  get out(): string {
-    return this._out;
+  getOut(): string {
+    return this.out;
   }
 
-  get cmdline(): string {
-    return this._cmdline;
+  getCmdline(): string {
+    return this.cmdline;
   }
 
-  get lastOutLine(): string {
-    const end = this._out.lastIndexOf(`\n${MIGRATION_VERSION_APPLIED}\n`);
-    const out = end >= 0 ? this._out.substring(0, end + 1) : this._out;
+  getLastOutLine(): string {
+    const end = this.out.lastIndexOf(`\n${MIGRATION_VERSION_APPLIED}\n`);
+    const out = end >= 0 ? this.out.substring(0, end + 1) : this.out;
     let posNewline1 = out.lastIndexOf("\n");
     let posNewline2 = out.length;
     // Find the 1st non-empty line scanning backward.
@@ -79,7 +77,7 @@ export class Psql {
 
   async run(onOut: (proc: this) => void = () => {}): Promise<this> {
     return new Promise((resolve) => {
-      const proc = spawn("psql", this._args, {
+      const proc = spawn("psql", this.args, {
         cwd: this.cwd,
         env: {
           ...process.env,
@@ -112,22 +110,22 @@ export class Psql {
           clearSetInResponse = false;
         }
 
-        this._stdout += str;
-        this._out += str;
-        if (this._stdout !== "") {
+        this.stdout += str;
+        this.out += str;
+        if (this.stdout !== "") {
           onOut(this);
         }
       });
 
       proc.stderr.on("data", (data) => {
         const str = data.toString();
-        this._stderr += str;
-        this._out += str;
+        this.stderr += str;
+        this.out += str;
         onOut(this);
       });
 
       proc.on("close", (code) => {
-        this._code = code;
+        this.code = code;
         resolve(this);
       });
     });

@@ -10,6 +10,7 @@
 
 ## Functions
 
+- [actionChain](functions/actionChain.md)
 - [actionDigest](functions/actionDigest.md)
 - [actionList](functions/actionList.md)
 - [actionMake](functions/actionMake.md)

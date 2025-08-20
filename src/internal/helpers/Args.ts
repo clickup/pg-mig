@@ -17,6 +17,10 @@ export class Args<TStringArgs extends string, TFlagArgs extends string> {
     return this.args[name];
   }
 
+  getFlag(name: TFlagArgs): boolean {
+    return !!this.args[name];
+  }
+
   get(name: TStringArgs, def?: string): string {
     const v = this.args[name] !== undefined ? this.args[name] : def;
     if (v === undefined) {
@@ -24,9 +28,5 @@ export class Args<TStringArgs extends string, TFlagArgs extends string> {
     }
 
     return v;
-  }
-
-  flag(name: TFlagArgs): boolean {
-    return !!this.args[name];
   }
 }

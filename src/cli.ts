@@ -2,6 +2,7 @@
 import compact from "lodash/compact";
 import mapValues from "lodash/mapValues";
 import pickBy from "lodash/pickBy";
+import { actionChain } from "./actions/actionChain";
 import { actionDigest } from "./actions/actionDigest";
 import { actionList } from "./actions/actionList";
 import { actionMake } from "./actions/actionMake";
@@ -44,6 +45,7 @@ export interface MigrateOptions {
   /** What to do. */
   action:
     | { type: "make"; name: string }
+    | { type: "chain" }
     | { type: "list" }
     | { type: "digest" }
     | { type: "undo"; version: string }
@@ -84,6 +86,7 @@ export async function main(argsIn: string[]): Promise<boolean> {
       "db",
       "undo",
       "make",
+      "chain",
       "list",
       "parallelism",
     ],
@@ -93,15 +96,17 @@ export async function main(argsIn: string[]): Promise<boolean> {
   const action: MigrateOptions["action"] =
     args.getOptional("make") !== undefined
       ? { type: "make", name: args.get("make") }
-      : args.getOptional("list") === ""
-        ? { type: "list" }
-        : args.getOptional("list") === "digest"
-          ? { type: "digest" }
-          : args.getOptional("undo") !== undefined
-            ? { type: "undo", version: args.get("undo") }
-            : { type: "apply", after: [] };
+      : args.getOptional("chain") !== undefined
+        ? { type: "chain" }
+        : args.getOptional("list") === ""
+          ? { type: "list" }
+          : args.getOptional("list") === "digest"
+            ? { type: "digest" }
+            : args.getOptional("undo") !== undefined
+              ? { type: "undo", version: args.get("undo") }
+              : { type: "apply", after: [] };
 
-  if (!args.flag("skip-config")) {
+  if (!args.getFlag("skip-config")) {
     for (const config of await readConfigs("pg-mig.config", action.type)) {
       Object.assign(
         process.env,
@@ -137,13 +142,13 @@ export async function main(argsIn: string[]): Promise<boolean> {
     pass: args.get("pass", process.env["PGPASSWORD"] || "") || undefined,
     db: args.get("db", process.env["PGDATABASE"] || "") || undefined,
     createDB:
-      args.flag("createdb") ||
+      args.getFlag("createdb") ||
       ![undefined, null, "", "0", "false", "undefined", "null", "no"].includes(
         process.env["PGCREATEDB"],
       ),
     parallelism: parseInt(args.get("parallelism", "0")) || undefined,
-    dry: args.flag("dry"),
-    force: args.flag("force"),
+    dry: args.getFlag("dry"),
+    force: args.getFlag("force"),
     action,
   });
 }
@@ -167,7 +172,7 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
 
   // Available in *.sql migration version files.
   process.env["PG_MIG_HOSTS"] = hostDests
-    .map((dest) => dest.hostSpec())
+    .map((dest) => dest.getHostSpec())
     .join(",");
 
   const portIsSignificant = hostDests.some(
@@ -180,7 +185,7 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
 
   printText(
     compact([
-      "Running on " + hostDests.map((dest) => dest.name()).join(","),
+      "Running on " + hostDests.map((dest) => dest.getName()).join(","),
       !portIsSignificant && `port ${hostDests[0].port}`,
       !dbIsSignificant && `db ${hostDests[0].db}`,
     ]).join(", "),
@@ -188,6 +193,10 @@ export async function migrate(options: MigrateOptions): Promise<boolean> {
 
   if (options.action.type === "make") {
     return actionMake(options, registry, options.action.name);
+  }
+
+  if (options.action.type === "chain") {
+    return actionChain(options, registry);
   }
 
   if (options.action.type === "list") {

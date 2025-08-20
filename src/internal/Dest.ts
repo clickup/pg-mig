@@ -234,7 +234,7 @@ export class Dest {
   /**
    * Returns a short human-readable representation of the Dest.
    */
-  name(short?: "short"): string {
+  getName(short?: "short"): string {
     return (
       (!short || this.host.match(/^\d+\.\d+\.\d+\.\d+$/)
         ? this.host
@@ -247,7 +247,7 @@ export class Dest {
   /**
    * Returns host:port/db spec.
    */
-  hostSpec(): string {
+  getHostSpec(): string {
     return `${this.host}:${this.port}/${this.db}`;
   }
 
@@ -255,7 +255,7 @@ export class Dest {
    * Returns a human-readable representation of the Dest with schema.
    */
   toString(): string {
-    return this.name() + ":" + this.schema;
+    return this.getName() + ":" + this.schema;
   }
 
   /**
@@ -490,7 +490,10 @@ export class Dest {
       ],
       sql,
     );
-    const { code, stdout, out } = await psql.run();
+    await psql.run();
+    const code = psql.getCode();
+    const stdout = psql.getStdout();
+    const out = psql.getOut();
     if (code) {
       throw (
         `psql failed (${this.toString()})\n` +
